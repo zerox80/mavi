@@ -5,7 +5,6 @@ import { fileURLToPath } from 'node:url';
 import {
   escapeHtml,
   initials,
-  bandwidthWalk,
   friendlyError,
   heroFromVpnStatus,
   toConfig,
@@ -65,37 +64,6 @@ describe('initials', () => {
     expect(initials(null)).toBe('N'); // from "null"
     expect(initials(undefined)).toBe('U'); // from "undefined"
     expect(initials(42)).toBe('4');
-  });
-});
-
-describe('bandwidthWalk', () => {
-  it('returns correct number of values', () => {
-    expect(bandwidthWalk(10)).toHaveLength(10);
-    expect(bandwidthWalk(60)).toHaveLength(60);
-  });
-
-  it('is deterministic with same seed', () => {
-    const a = bandwidthWalk(20, 42);
-    const b = bandwidthWalk(20, 42);
-    expect(a).toEqual(b);
-  });
-
-  it('values are in reasonable range', () => {
-    const values = bandwidthWalk(100);
-    for (const v of values) {
-      expect(v).toBeGreaterThan(0);
-      expect(v).toBeLessThanOrEqual(1.1);
-    }
-  });
-
-  it('different seeds produce different results', () => {
-    const a = bandwidthWalk(10, 1);
-    const b = bandwidthWalk(10, 2);
-    expect(a).not.toEqual(b);
-  });
-
-  it('returns empty array for n=0', () => {
-    expect(bandwidthWalk(0)).toEqual([]);
   });
 });
 

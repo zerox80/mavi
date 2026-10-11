@@ -15,6 +15,7 @@ use tokio::sync::{Mutex, OwnedSemaphorePermit, Semaphore};
 
 use tracing::{error, info, warn};
 
+mod scoped;
 mod transport;
 pub use transport::send_request;
 use transport::{bind_ipc_socket, handle_ipc_client, resolve_ipc_token_access};
@@ -37,6 +38,7 @@ struct DaemonState {
     current_token: Arc<StdMutex<String>>,
     vpn_task: Option<tokio::task::JoinHandle<()>>,
     active_config: Option<Config>,
+    session_id: Option<String>,
 }
 
 impl DaemonState {
@@ -50,6 +52,7 @@ impl DaemonState {
             current_token: Arc::new(StdMutex::new(String::new())),
             vpn_task: None,
             active_config: None,
+            session_id: None,
         }
     }
 }
@@ -152,6 +155,11 @@ async fn dispatch_request_with_hooks(
     cleanup_stale_network_state: fn() -> Result<()>,
 ) -> IpcResponse {
     let mut guard = state.lock().await;
+    // Resolve and check scoped commands under the same lock as their effects.
+    let (req, session_id) = match scoped::resolve(req, &guard) {
+        Ok(request) => request,
+        Err(response) => return response,
+    };
     match req {
         IpcRequest::Status => {
             let running = guard.vpn_running.load(Ordering::SeqCst);
@@ -234,6 +242,7 @@ async fn dispatch_request_with_hooks(
                 IpcResponse::Error("VPN is already running".to_string())
             } else {
                 guard.active_config = Some(config.clone());
+                guard.session_id = session_id;
                 guard.vpn_running.store(true, Ordering::SeqCst);
                 guard.vpn_connected.store(false, Ordering::SeqCst);
                 guard.vpn_stopping.store(false, Ordering::SeqCst);
@@ -301,6 +310,12 @@ async fn dispatch_request_with_hooks(
             connection_id: None,
             refresh_token: None,
         },
+        IpcRequest::StartScoped { .. }
+        | IpcRequest::SessionStatus { .. }
+        | IpcRequest::UpdateSessionToken { .. }
+        | IpcRequest::StopSession { .. } => {
+            unreachable!("scoped requests are resolved before dispatch")
+        }
     }
 }
 

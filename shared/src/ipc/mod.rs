@@ -179,6 +179,15 @@ pub enum IpcRequest {
     /// Atomically fetch and clear the latest rotated refresh token produced by
     /// the service-side Keycloak refresh task, if any.
     TakeRefreshTokenUpdate,
+    /// Start a session whose GUI refresh requests carry a fresh per-start ID.
+    /// Appended variants preserve the existing positional IPC wire format.
+    StartScoped { session_id: String, config: Config },
+    /// Query only the named, still-running session (including reconnects).
+    SessionStatus { session_id: String },
+    /// Refresh only the named session, atomically with the ownership check.
+    UpdateSessionToken { session_id: String, token: String },
+    /// Stop only the named session; a stale ticker cannot stop its successor.
+    StopSession { session_id: String },
 }
 
 impl fmt::Debug for IpcRequest {
@@ -198,6 +207,24 @@ impl fmt::Debug for IpcRequest {
                 .field("keycloak", keycloak)
                 .finish(),
             Self::TakeRefreshTokenUpdate => f.write_str("TakeRefreshTokenUpdate"),
+            Self::StartScoped { session_id, config } => f
+                .debug_struct("StartScoped")
+                .field("session_id", session_id)
+                .field("config", config)
+                .finish(),
+            Self::SessionStatus { session_id } => f
+                .debug_struct("SessionStatus")
+                .field("session_id", session_id)
+                .finish(),
+            Self::UpdateSessionToken { session_id, .. } => f
+                .debug_struct("UpdateSessionToken")
+                .field("session_id", session_id)
+                .field("token", &"<redacted>")
+                .finish(),
+            Self::StopSession { session_id } => f
+                .debug_struct("StopSession")
+                .field("session_id", session_id)
+                .finish(),
         }
     }
 }

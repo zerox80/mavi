@@ -12,10 +12,8 @@ import {
 } from './vpn.js';
 import {
   startCoreAnimation,
-  renderSparkline,
   startStatsAnimation,
   startSessionClock,
-  updateSparklineColors,
 } from './animations.js';
 import { showToast } from './toast.js';
 
@@ -53,7 +51,6 @@ document.addEventListener('DOMContentLoaded', async () => {
   renderConnectionList();
 
   startCoreAnimation();
-  renderSparkline();
   startStatsAnimation();
   startSessionClock();
 
@@ -114,9 +111,3 @@ function wireShortcuts() {
     }
   });
 }
-
-// Re-tint sparkline when state changes — hook into setHero via MutationObserver
-new MutationObserver(updateSparklineColors).observe(document.documentElement, {
-  attributes: true,
-  attributeFilter: ['data-state', 'data-theme'],
-});
