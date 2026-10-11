@@ -43,6 +43,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.mavi.vpn.VpnConnectionState
 import com.mavi.vpn.OAuthHelper
 import com.mavi.vpn.ui.components.MaviCore
 import com.mavi.vpn.ui.components.MaviCoreState
@@ -54,7 +55,7 @@ import kotlinx.coroutines.delay
 @Composable
 fun HomeView(
     viewModel: VpnViewModel,
-    isConnected: Boolean,
+    connectionState: VpnConnectionState,
     onConnect: (String, String, String, String) -> Unit,
     onDisconnect: () -> Unit,
     onOpenSettings: () -> Unit,
@@ -70,8 +71,21 @@ fun HomeView(
     val kcUrl by viewModel.kcUrl.collectAsState()
     val hasKeycloakRefreshToken = viewModel.hasSavedKeycloakRefreshToken()
 
-    val state = if (isConnected) MaviCoreState.ON else MaviCoreState.OFF
-    val labelColor = if (isConnected) T.ok else T.mute
+    val isConnected = connectionState == VpnConnectionState.CONNECTED
+    val isConnecting = connectionState == VpnConnectionState.CONNECTING ||
+        connectionState == VpnConnectionState.RECONNECTING
+    val state = when {
+        isConnected -> MaviCoreState.ON
+        isConnecting -> MaviCoreState.CONNECTING
+        else -> MaviCoreState.OFF
+    }
+    val statusLabel = when (connectionState) {
+        VpnConnectionState.STOPPED -> "NOT CONNECTED"
+        VpnConnectionState.CONNECTING -> "CONNECTING"
+        VpnConnectionState.CONNECTED -> "ENCRYPTED"
+        VpnConnectionState.RECONNECTING -> "RECONNECTING"
+    }
+    val labelColor = if (isConnected) T.ok else if (isConnecting) T.accent else T.mute
     val isDark = androidx.compose.foundation.isSystemInDarkTheme()
 
     Column(
@@ -116,7 +130,7 @@ fun HomeView(
 
         // Status Text
         Text(
-            text = "// ${if (isConnected) "ENCRYPTED" else "NOT CONNECTED"}",
+            text = "// $statusLabel",
             fontFamily = MaterialTheme.typography.labelSmall.fontFamily,
             fontSize = 10.sp,
             letterSpacing = 2.sp,
@@ -133,7 +147,7 @@ fun HomeView(
         )
         Spacer(modifier = Modifier.height(4.dp))
         Text(
-            text = "Port $serverPort · ${if (isConnected) "tunnel active" else "ready"}",
+            text = "Port $serverPort · ${if (isConnected) "tunnel active" else if (isConnecting) "connecting…" else "ready"}",
             fontSize = 13.sp,
             color = T.ink2
         )
@@ -143,7 +157,7 @@ fun HomeView(
         // Connect Button
         Button(
             onClick = {
-                if (isConnected) {
+                if (connectionState.canStop) {
                     onDisconnect()
                 } else {
                     viewModel.updateErrorMessage("")
@@ -185,7 +199,7 @@ fun HomeView(
                 )
         ) {
             Text(
-                text = if (isConnected) "Disconnect" else "Connect",
+                text = if (isConnected) "Disconnect" else if (isConnecting) "Cancel" else "Connect",
                 fontSize = 15.sp,
                 fontWeight = FontWeight.SemiBold,
                 letterSpacing = 0.3.sp
