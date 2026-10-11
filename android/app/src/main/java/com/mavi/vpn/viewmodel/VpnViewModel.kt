@@ -2,6 +2,7 @@ package com.mavi.vpn.viewmodel
 
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
+import com.mavi.vpn.VpnConnectionState
 import com.mavi.vpn.MaviVpnService
 import com.mavi.vpn.data.PrefsManager
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -69,7 +70,7 @@ class VpnViewModel(
     private val _errorMessage = MutableStateFlow("")
     val errorMessage: StateFlow<String> = _errorMessage.asStateFlow()
 
-    val isConnected = MaviVpnService.isConnected
+    val connectionState = MaviVpnService.connectionState
 
     init {
         // We only clear out token entirely if the token is completely
@@ -126,7 +127,7 @@ class VpnViewModel(
             // Persist the preshared key before switching so a later Keycloak login
             // cannot clobber it.
             prefs.savedPresharedKey = presharedKey.value
-        } else if (!isConnected.value) {
+        } else if (connectionState.value != VpnConnectionState.CONNECTED) {
             // Leaving Keycloak mode: drop the OAuth session so a stale access or
             // refresh token can't masquerade as a valid session (and skip the
             // interactive login) the next time Keycloak is enabled. Skip while a
