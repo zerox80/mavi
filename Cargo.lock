@@ -3556,9 +3556,13 @@ dependencies = [
 name = "quic-tester"
 version = "1.1.0"
 dependencies = [
+ "anyhow",
+ "bytes",
  "h3",
  "h3-quinn",
+ "http",
  "quinn",
+ "rcgen",
  "rustls",
  "tokio",
 ]

@@ -119,13 +119,14 @@ describe('main startup workflow', () => {
 
   });
 
-  it('continues startup when prefs, migration, or event wiring fails', async () => {
+  it('skips migration and blocks writes when loading preferences fails', async () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     const invoke = vi
       .fn()
       .mockRejectedValueOnce(new Error('prefs offline'))
       .mockRejectedValueOnce(new Error('config offline'));
     const listen = vi.fn(() => Promise.reject(new Error('events offline')));
+    const migrateLegacyConfig = vi.fn();
     const applyTheme = vi.fn();
     const renderConnectionList = vi.fn();
     const refreshStatus = vi.fn(() => Promise.resolve());
@@ -143,7 +144,7 @@ describe('main startup workflow', () => {
     vi.doMock('../connections.js', () => ({
       wireSidebarSearch: vi.fn(),
       renderConnectionList,
-      migrateLegacyConfig: vi.fn(),
+      migrateLegacyConfig,
     }));
     vi.doMock('../modal.js', () => ({
       wireModal: vi.fn(),
@@ -171,7 +172,10 @@ describe('main startup workflow', () => {
     expect(renderConnectionList).toHaveBeenCalled();
     expect(refreshStatus).toHaveBeenCalled();
     expect(warn).toHaveBeenCalledWith('load_prefs failed:', expect.any(Error));
-    expect(warn).toHaveBeenCalledWith('legacy config migration skipped:', expect.any(Error));
+    expect(invoke).toHaveBeenCalledTimes(1);
+    expect(migrateLegacyConfig).not.toHaveBeenCalled();
+    const { state } = await import('../state.js');
+    expect(state.prefsWriteBlocked).toBe(true);
     expect(warn).toHaveBeenCalledWith('event wiring failed:', expect.any(Error));
   });
 });

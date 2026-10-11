@@ -255,10 +255,9 @@ def main():
     # Fedora/RHEL – RPM
     rpm = find_bundle("rpm/*.rpm")
     if rpm and shutil.which("rpm") and ask(f"Install via RPM ({rpm.name})?"):
-        # --replacepkgs (not the broader --force) lets this reinstall over a
-        # previous install of the same package without also suppressing
-        # rpm's file-conflict check against *other*, unrelated packages.
-        sudo("rpm", "-i", "--replacepkgs", str(rpm))
+        # Upgrade older versions and allow same-version reinstalls while
+        # preserving file-conflict checks against unrelated packages.
+        sudo("rpm", "-U", "--replacepkgs", str(rpm))
         ok("Installed via rpm")
         patch_system_desktop_entry()
         refresh_desktop_integration()

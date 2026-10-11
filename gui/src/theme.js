@@ -32,6 +32,9 @@ export function applyTheme(theme) {
 }
 
 export async function savePrefs(prefs = state.prefs) {
+  if (state.prefsWriteBlocked) {
+    throw new Error('Saved connections could not be loaded. Restart the app to retry.');
+  }
   await invoke('save_prefs', { prefs });
 }
 

@@ -68,6 +68,12 @@ pub async fn run_daemon(running_flag: Arc<AtomicBool>) -> Result<()> {
     let access = resolve_ipc_token_access()?;
     transport::write_ipc_token_with_access(&ipc::ipc_token_path(), &auth_token, access)?;
 
+    // Crash recovery must precede Start requests: endpoint resolution can need
+    // the original DNS servers before a new tunnel can be established.
+    if let Err(error) = crate::network::cleanup_stale_network_state() {
+        warn!(%error, "Startup network recovery needs attention");
+    }
+
     let listener = bind_ipc_socket(access)?;
     info!(
         "Daemon listening on {:?} (Auth token generated)",

@@ -194,14 +194,16 @@ else
     esac
     have_global_v6=false
     waited=0
-    while [ "$waited" -lt "$VPN_IPV6_WAIT" ]; do
+    while :; do
         if ip -6 addr show dev "$DEFAULT_IFACE" scope global 2>/dev/null | grep -q 'inet6 '; then
             echo "IPv6 address detected on $DEFAULT_IFACE"
             have_global_v6=true
             break
         fi
-        waited=$((waited + 1))
+        # Zero means no waiting, but still detect an already available address.
+        [ "$waited" -lt "$VPN_IPV6_WAIT" ] || break
         sleep 1
+        waited=$((waited + 1))
     done
 
     if [ "$have_global_v6" != "true" ]; then
