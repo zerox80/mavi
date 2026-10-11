@@ -15,6 +15,8 @@ export const state = {
   lastError: null,
   // Session wall clock
   sessionStart: null,
+  // Startup blocks persistence until load_prefs succeeds.
+  prefsWriteBlocked: true,
   // Saved UI prefs
   prefs: {
     theme: 'light',

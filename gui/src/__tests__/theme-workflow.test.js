@@ -11,6 +11,7 @@ vi.mock('../toast.js', () => ({ showToast: vi.fn() }));
 
 describe('theme workflows', () => {
   beforeEach(() => {
+    state.prefsWriteBlocked = false;
     vi.clearAllMocks();
     document.body.innerHTML = `
       <button id="theme-toggle"></button>

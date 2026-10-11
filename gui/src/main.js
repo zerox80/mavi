@@ -24,6 +24,8 @@ import { showToast } from './toast.js';
 document.addEventListener('DOMContentLoaded', async () => {
   await bootstrapTauri();
 
+  state.prefsWriteBlocked = true;
+
   wireTabs();
   wireSidebarSearch({ openModal, applyHeroForSelection });
   wireModal({ applyHeroForSelection });
@@ -31,20 +33,25 @@ document.addEventListener('DOMContentLoaded', async () => {
   wireThemeToggle();
   wireShortcuts();
 
-  // Load UI prefs (connections, theme) — tolerate missing backend
+  // Only enable writes after the saved profiles and secrets were read successfully.
   try {
     const prefs = await invoke('load_prefs');
-    if (prefs) state.prefs = normalizePrefs(prefs);
+    if (!prefs) throw new Error('No preferences returned by backend');
+    state.prefs = normalizePrefs(prefs);
+    state.prefsWriteBlocked = false;
   } catch (e) {
     console.warn('load_prefs failed:', e);
+    showToast('Could not load saved connections. Restart the app to retry.', 'error');
   }
 
   // One-time migration from the old editable runtime config into saved connections.
-  try {
-    const config = await invoke('load_config');
-    await migrateLegacyConfig(config);
-  } catch (e) {
-    console.warn('legacy config migration skipped:', e);
+  if (!state.prefsWriteBlocked) {
+    try {
+      const config = await invoke('load_config');
+      await migrateLegacyConfig(config);
+    } catch (e) {
+      console.warn('legacy config migration skipped:', e);
+    }
   }
 
   applyTheme(state.prefs.theme);

@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { state } from '../state.js';
 import { invoke } from '../api.js';
+import { savePrefs } from '../theme.js';
 import { openModal, saveModal, deleteModal, wireModal } from '../modal.js';
 import { showToast } from '../toast.js';
 import { migrateLegacyConfig, selectConnection } from '../connections.js';
@@ -10,6 +11,7 @@ vi.mock('../toast.js', () => ({ showToast: vi.fn() }));
 
 beforeEach(() => {
   vi.resetAllMocks();
+  state.prefsWriteBlocked = false;
   vi.useFakeTimers();
   document.body.innerHTML = [
     'm_label', 'm_endpoint', 'm_token', 'm_cert_pin', 'm_ech_config', 'm_cr_mode',
@@ -87,4 +89,15 @@ it('rolls back selection and leaves failed legacy migration retryable', async ()
   await expect(migrateLegacyConfig({ endpoint: 'legacy.example.test:443' })).rejects.toThrow('keyring unavailable');
   expect(state.prefs.legacy_config_migrated).toBe(false);
   expect(state.prefs.connections).toEqual([]);
+});
+
+it('never overwrites unread profiles even if later writes would succeed', async () => {
+  state.prefsWriteBlocked = true;
+  invoke.mockResolvedValue(undefined);
+  await expect(savePrefs()).rejects.toThrow('could not be loaded');
+  await expect(migrateLegacyConfig({ endpoint: 'legacy.example.test:443' }))
+    .rejects.toThrow('could not be loaded');
+  expect(invoke).not.toHaveBeenCalled();
+  expect(state.prefs.connections).toEqual([]);
+  expect(state.prefs.legacy_config_migrated).toBe(false);
 });

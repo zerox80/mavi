@@ -10,6 +10,7 @@ const connected = { service_available: true, running: true, state: 'Connected',
 
 beforeEach(() => {
   vi.resetAllMocks();
+  state.prefsWriteBlocked = false;
   document.body.innerHTML = ['connect-btn', 'ip-readout', 'hero-title',
     'hero-subtitle', 'hero-node-id', 'hero-lat', 'title-state-label',
     'hero-status', 'core-label', 'net-node', 'net-endpoint', 'net-ip',
