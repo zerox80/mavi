@@ -20,7 +20,9 @@ use base64::Engine;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 mod callback;
+mod readiness;
 mod server;
+pub use readiness::wait_for_usable_access_token;
 
 pub use callback::{
     callback_request_target, classify_oauth_callback, http_request_head_complete,

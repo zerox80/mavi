@@ -38,7 +38,6 @@ describe('main startup workflow', () => {
     const refreshStatus = vi.fn(() => Promise.resolve());
     const applyStatus = vi.fn();
     const toggleConnection = vi.fn();
-    const updateSparklineColors = vi.fn();
 
     vi.doMock('../api.js', () => ({
       bootstrapTauri: vi.fn(() => Promise.resolve(true)),
@@ -68,10 +67,8 @@ describe('main startup workflow', () => {
     }));
     vi.doMock('../animations.js', () => ({
       startCoreAnimation: vi.fn(),
-      renderSparkline: vi.fn(),
       startStatsAnimation: vi.fn(),
       startSessionClock: vi.fn(),
-      updateSparklineColors,
     }));
 
     await import('../main.js');
@@ -120,9 +117,6 @@ describe('main startup workflow', () => {
     document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
     expect(cancelClick).toHaveBeenCalledOnce();
 
-    document.documentElement.setAttribute('data-theme', 'dark');
-    await new Promise((resolve) => setTimeout(resolve, 0));
-    expect(updateSparklineColors).toHaveBeenCalled();
   });
 
   it('continues startup when prefs, migration, or event wiring fails', async () => {
@@ -164,10 +158,8 @@ describe('main startup workflow', () => {
     }));
     vi.doMock('../animations.js', () => ({
       startCoreAnimation: vi.fn(),
-      renderSparkline: vi.fn(),
       startStatsAnimation: vi.fn(),
       startSessionClock: vi.fn(),
-      updateSparklineColors: vi.fn(),
     }));
 
     await import('../main.js');

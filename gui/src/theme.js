@@ -1,12 +1,20 @@
 import { state, $ } from './state.js';
 import { invoke } from './api.js';
+import { showToast } from './toast.js';
 
 export function wireThemeToggle() {
   $('theme-toggle').addEventListener('click', async () => {
-    const next = state.prefs.theme === 'light' ? 'dark' : 'light';
+    const previous = state.prefs.theme;
+    const next = previous === 'light' ? 'dark' : 'light';
     state.prefs.theme = next;
     applyTheme(next);
-    await savePrefs();
+    try {
+      await savePrefs();
+    } catch {
+      state.prefs.theme = previous;
+      applyTheme(previous);
+      showToast('Could not save the theme. Please try again.', 'error');
+    }
   });
 }
 
@@ -23,12 +31,8 @@ export function applyTheme(theme) {
   }
 }
 
-export async function savePrefs() {
-  try {
-    await invoke('save_prefs', { prefs: state.prefs });
-  } catch (e) {
-    console.warn('save_prefs failed:', e);
-  }
+export async function savePrefs(prefs = state.prefs) {
+  await invoke('save_prefs', { prefs });
 }
 
 export function normalizePrefs(prefs = {}) {

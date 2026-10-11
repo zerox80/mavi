@@ -2,10 +2,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { state } from '../state.js';
 import { invoke } from '../api.js';
 import { applyTheme, normalizePrefs, savePrefs, wireThemeToggle } from '../theme.js';
+import { showToast } from '../toast.js';
 
 vi.mock('../api.js', () => ({
   invoke: vi.fn(() => Promise.resolve()),
 }));
+vi.mock('../toast.js', () => ({ showToast: vi.fn() }));
 
 describe('theme workflows', () => {
   beforeEach(() => {
@@ -56,13 +58,21 @@ describe('theme workflows', () => {
     expect(invoke).toHaveBeenCalledWith('save_prefs', { prefs: state.prefs });
   });
 
-  it('logs failed preference saves without throwing', async () => {
-    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+  it('propagates preference save errors to callers', async () => {
     invoke.mockRejectedValueOnce(new Error('offline'));
 
-    await expect(savePrefs()).resolves.toBeUndefined();
+    await expect(savePrefs()).rejects.toThrow('offline');
+  });
 
-    expect(warn).toHaveBeenCalledWith('save_prefs failed:', expect.any(Error));
+  it('restores the previous theme when persistence fails', async () => {
+    invoke.mockRejectedValueOnce(new Error('offline'));
+    wireThemeToggle();
+    document.getElementById('theme-toggle').click();
+
+    await vi.waitFor(() => expect(showToast).toHaveBeenCalled());
+    expect(state.prefs.theme).toBe('light');
+    expect(document.documentElement.getAttribute('data-theme')).toBe('light');
+    expect(showToast).toHaveBeenCalledWith(expect.stringContaining('Could not save'), 'error');
   });
 
   it('normalizes missing and malformed prefs', () => {

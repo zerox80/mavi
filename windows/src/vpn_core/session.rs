@@ -130,7 +130,20 @@ pub(super) async fn run(
     // Read the freshest access token (service refresh or IPC may have updated it
     // since this session's config was captured). Fall back to the seed token if
     // the lock is poisoned.
-    let token = runtime.current_token_or(&config.token);
+    let token = if config.kc_auth.unwrap_or(false) {
+        let Some(token) = shared::kc_oauth::wait_for_usable_access_token(
+            || runtime.current_token_or(&config.token),
+            || runtime.is_running(),
+            HANDSHAKE_TIMEOUT_SECS,
+        )
+        .await
+        else {
+            return Ok(SessionEnd::UserStopped);
+        };
+        token
+    } else {
+        runtime.current_token_or(&config.token)
+    };
 
     let connect_started = Instant::now();
     let handshake = tokio::time::timeout(
