@@ -11,7 +11,8 @@ ROOT = Path(__file__).resolve().parents[2]
 
 class BackendEntrypointTests(unittest.TestCase):
     def run_entrypoint(self, ipv6_present, disable_ipv6, ipv6_nat_available,
-                       route_output="8.8.8.8 via 192.0.2.1 dev eth0 src 192.0.2.2"):
+                       route_output="8.8.8.8 via 192.0.2.1 dev eth0 src 192.0.2.2",
+                       http2_address=None):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             commands = root / "bin"
@@ -40,7 +41,7 @@ esac
 """)
                 path.chmod(0o755)
             server = commands / "mavi-vpn"
-            server.write_text('#!/bin/bash\necho "SERVER_STARTED IPv6=${VPN_DISABLE_IPV6:-false}"\n')
+            server.write_text('#!/bin/bash\necho "SERVER_STARTED IPv6=${VPN_DISABLE_IPV6:-false} HTTP2=${VPN_HTTP2_BIND_ADDR-unset}"\n')
             server.chmod(0o755)
             script = (ROOT / "backend/entrypoint.sh").read_text()
             script = script.replace("/dev/net/tun", "/dev/null")
@@ -54,8 +55,20 @@ esac
                    "VPN_MSS_CLAMPING": "false", "VPN_IPV6_WAIT": "1",
                    "TEST_COMMAND_LOG": str(log), "TEST_IPV6_NAT": str(ipv6_nat_available).lower(),
                    "TEST_ROUTE_OUTPUT": route_output}
+            env.pop("VPN_HTTP2_BIND_ADDR", None)
+            if http2_address is not None:
+                env["VPN_HTTP2_BIND_ADDR"] = http2_address
             result = subprocess.run(["bash", str(path)], env=env, capture_output=True, text=True, timeout=10)
             return result, log.read_text()
+
+    def test_optional_http2_address_reaches_server_only_when_nonempty(self):
+        for address, expected in [(None, "unset"), ("", "unset"),
+                                  ("0.0.0.0:10443", "0.0.0.0:10443"),
+                                  ("not-an-address", "not-an-address")]:
+            with self.subTest(address=address):
+                result, _ = self.run_entrypoint(False, True, False, http2_address=address)
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertIn(f"HTTP2={expected}", result.stdout)
 
     def test_kernel_without_ipv6_starts_ipv4_server(self):
         result, commands = self.run_entrypoint(False, False, False)
