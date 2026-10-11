@@ -47,8 +47,9 @@ export function renderConnectionList() {
   for (const c of filtered) {
     const row = document.createElement('div');
     const isSelected = c.id === state.prefs.active_id;
-    const isActive = isSelected && state.hero === 'on';
-    const isConnecting = isSelected && state.hero === 'connecting';
+    const isSession = c.id === state.sessionConnection?.id;
+    const isActive = isSession && state.hero === 'on';
+    const isConnecting = isSession && state.hero === 'connecting';
     row.className =
       'conn-row' +
       (isSelected ? ' selected' : '') +
