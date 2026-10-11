@@ -3,13 +3,14 @@ import { invoke } from './api.js';
 import { showToast, hideToast, showServiceOfflineHint, daemonHintText } from './toast.js';
 import { renderConnectionList } from './connections.js';
 import { heroFromVpnStatus, toConfig, friendlyError } from './utils.js';
+import { selectedConnection, rememberSession, displayedConnection } from './session.js';
 
 export function wireHero() {
   $('connect-btn').addEventListener('click', () => toggleConnection());
 }
 
 export function activeConn() {
-  return state.prefs.connections.find((c) => c.id === state.prefs.active_id) || null;
+  return selectedConnection();
 }
 
 export async function toggleConnection() {
@@ -47,6 +48,7 @@ export async function connect() {
   state.connectRequestId = requestId;
   state.pendingConnect = true;
   state.vpnState = 'Starting';
+  rememberSession(conn);
   setHero('connecting');
   try {
     await invoke('save_config', { config });
@@ -127,6 +129,10 @@ export function applyStatus(status) {
   state.activeEndpoint = status.endpoint || null;
   state.vpnState = status.state || (state.running ? 'Connected' : 'Stopped');
   state.lastError = status.last_error || null;
+  if (!state.pendingConnect && state.sessionConnection &&
+      state.activeEndpoint && state.sessionConnection.endpoint !== state.activeEndpoint) {
+    state.sessionConnection = null;
+  }
 
   const btn = $('connect-btn');
   if (!btn) return;
@@ -197,6 +203,7 @@ export function applyStatus(status) {
 
 export function setHero(s) {
   state.hero = s;
+  if (s === 'off') state.sessionConnection = null;
   document.documentElement.setAttribute('data-state', s);
 
   const btn = $('connect-btn');
@@ -240,7 +247,7 @@ export function setHero(s) {
 }
 
 export function applyHeroForSelection() {
-  const conn = activeConn();
+  const conn = displayedConnection();
   if (conn) {
     $('hero-title').textContent = conn.label;
     $('hero-subtitle').textContent =
@@ -251,7 +258,7 @@ export function applyHeroForSelection() {
           : state.hero === 'disconnecting'
             ? 'Closing tunnel and cleaning up routes'
             : 'Tunnel your connection through this node';
-    $('hero-node-id').textContent = conn.id.slice(0, 8).toUpperCase();
+    $('hero-node-id').textContent = conn.id.slice(0, 8).toUpperCase() || '—';
     $('hero-lat').textContent = conn.endpoint.toUpperCase();
   } else {
     $('hero-title').textContent = 'No node selected';
@@ -266,17 +273,21 @@ export function applyHeroForSelection() {
       (!state.running && !state.serviceAvailable && !state.pendingConnect) ||
       (state.hero === 'off' && !conn);
   }
+  updateNetworkPanel();
 }
 
 export function updateNetworkPanel() {
-  const conn = activeConn();
+  const conn = displayedConnection();
   $('net-node').textContent = conn ? conn.label : '—';
-  $('net-endpoint').textContent = state.activeEndpoint || conn?.endpoint || '—';
+  $('net-endpoint').textContent = conn?.endpoint || '—';
   $('net-ip').textContent = $('ip-readout').textContent;
   $('net-service').textContent = state.serviceAvailable ? 'ONLINE' : 'OFFLINE';
   const protocol = $('net-protocol');
   const transport = $('net-transport');
-  if (conn?.http2_framing) {
+  if (conn?.transportUnknown) {
+    if (protocol) protocol.textContent = '—';
+    if (transport) transport.textContent = '—';
+  } else if (conn?.http2_framing) {
     if (protocol) protocol.textContent = 'TCP - TLS 1.3';
     if (transport) transport.textContent = 'HTTP/2 CONNECT-IP';
   } else {
