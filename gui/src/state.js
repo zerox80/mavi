@@ -10,6 +10,7 @@ export const state = {
   serviceAvailable: false,
   running: false,
   activeEndpoint: null,
+  sessionConnection: null, // Snapshot of the profile used for this session.
   vpnState: 'Stopped',
   lastError: null,
   // Session wall clock

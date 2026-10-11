@@ -193,6 +193,7 @@ describe('connection list rendering and selection', () => {
   });
 
   it('renders active and connecting selection classes', () => {
+    state.sessionConnection = { ...state.prefs.connections[0] };
     state.hero = 'on';
     renderConnectionList();
     expect(document.querySelector('.conn-row').className).toContain('active');
