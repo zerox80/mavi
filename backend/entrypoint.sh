@@ -3,6 +3,12 @@ set -e
 
 echo "Starting Mavi VPN Server..."
 
+# Compose forwards an unset optional address as an empty string. Clap's
+# SocketAddr parser requires the variable to be absent to disable HTTP/2.
+if [ -z "${VPN_HTTP2_BIND_ADDR:-}" ]; then
+    unset VPN_HTTP2_BIND_ADDR
+fi
+
 if [ "${VPN_KEYCLOAK_ENABLED:-false}" != "true" ]; then
     case "${VPN_AUTH_TOKEN:-}" in
         ""|"change_me"|"change-me"|"changeme")
