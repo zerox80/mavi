@@ -1,4 +1,6 @@
 #![allow(clippy::multiple_crate_versions)]
+mod probe;
+
 use quinn::{ClientConfig, Endpoint};
 use rustls::DigitallySignedStruct;
 use rustls::client::danger::{HandshakeSignatureValid, ServerCertVerified, ServerCertVerifier};
@@ -60,7 +62,7 @@ impl ServerCertVerifier for SkipServerVerification {
 const DEFAULT_SERVER_ADDR: &str = "194.242.56.169:10443";
 
 #[tokio::main]
-async fn main() -> Result<(), Box<dyn std::error::Error>> {
+async fn main() -> anyhow::Result<()> {
     // Usage: quic-tester [host:port]  (defaults to DEFAULT_SERVER_ADDR)
     let target = std::env::args()
         .nth(1)
@@ -68,13 +70,21 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let server_addr: SocketAddr = target.parse()?;
 
     // 1. Create QUIC Endpoint
-    let endpoint = Endpoint::client("0.0.0.0:0".parse()?)?;
+    let bind_addr = if server_addr.is_ipv6() {
+        "[::]:0"
+    } else {
+        "0.0.0.0:0"
+    };
+    let endpoint = Endpoint::client(bind_addr.parse()?)?;
 
     // 2. Allow all certificates (Skip Verification)
-    let mut crypto = rustls::ClientConfig::builder()
-        .dangerous()
-        .with_custom_certificate_verifier(SkipServerVerification::new())
-        .with_no_client_auth();
+    let mut crypto = rustls::ClientConfig::builder_with_provider(
+        rustls::crypto::aws_lc_rs::default_provider().into(),
+    )
+    .with_protocol_versions(&[&rustls::version::TLS13])?
+    .dangerous()
+    .with_custom_certificate_verifier(SkipServerVerification::new())
+    .with_no_client_auth();
 
     crypto.alpn_protocols = vec![b"h3".to_vec()];
 
@@ -85,56 +95,31 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     println!("Connecting to Mavi-VPN on {server_addr}");
 
-    // 3. Establish connection
-    let connection = endpoint.connect(server_addr, "localhost")?.await?;
-    println!("QUIC Handshake successful.");
+    // Bound both connection establishment and the HTTP/3 exchange.
+    let response = tokio::time::timeout(std::time::Duration::from_secs(5), async {
+        let connection = endpoint.connect(server_addr, "localhost")?.await?;
+        println!("QUIC Handshake successful. Sending unauthenticated HTTP/3 GET...");
+        probe::request(connection).await
+    })
+    .await??;
 
-    // 4. INTENTIONALLY do not send a token
-    let (mut send, mut recv) = connection.open_bi().await?;
-
-    let fake_request = b"GET / HTTP/3\r\n\r\n";
-    send.write_all(fake_request).await?;
-    send.finish()?;
-
-    println!("Fake HTTP/3 Request sent. Waiting for response...");
-
-    // 5. Read response from server (read everything available before connection dies)
-    let _buf: Vec<u8> = Vec::new();
-    let read_result =
-        tokio::time::timeout(std::time::Duration::from_secs(5), recv.read_to_end(1024)).await;
-
-    match read_result {
-        Ok(Ok(response)) => {
-            let n = response.len();
-            println!("\nSERVER RESPONSE ({n} Bytes):");
-            println!("--------------------------------------------------");
-
-            print!("Hex (Frames): ");
-            for b in &response[..std::cmp::min(n, 20)] {
-                print!("{b:02X} ");
-            }
-            println!("...");
-
-            let text = String::from_utf8_lossy(&response);
-            println!("\nText Extract:");
-            println!("{text}");
-            println!("--------------------------------------------------");
-
-            if text.contains("nginx") {
-                println!("\nSUCCESS: The server is pretending to be NGINX!");
-            }
-        }
-        Ok(Err(e)) => match e {
-            quinn::ReadToEndError::Read(
-                quinn::ReadError::ConnectionLost(_) | quinn::ReadError::ClosedStream,
-            ) => {
-                // If the stream dropped but we didn't read to end, fallback to a smaller read
-                println!("Stream Error (Connection dropped by server).");
-            }
-            _ => println!("Stream Error: {e:?}"),
-        },
-        Err(_) => println!("Timeout"),
+    println!("\nSERVER RESPONSE: {}", response.status());
+    for (name, value) in response.headers() {
+        println!("{name}: {}", value.to_str().unwrap_or("<binary>"));
     }
+    let text = String::from_utf8_lossy(response.body());
+    println!("\n{text}");
+    anyhow::ensure!(
+        response.status().is_success()
+            && response
+                .headers()
+                .get("server")
+                .is_some_and(|value| value == "nginx")
+            && text.contains("nginx"),
+        "The server did not return the expected nginx camouflage response"
+    );
+    println!("\nSUCCESS: The server is pretending to be NGINX!");
+    endpoint.close(0_u32.into(), b"probe complete");
 
     Ok(())
 }

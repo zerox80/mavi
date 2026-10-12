@@ -128,8 +128,8 @@ pub struct Config {
     #[arg(long, env = "VPN_DNS_V6")]
     pub dns_v6: Option<std::net::Ipv6Addr>,
 
-    /// Split-tunnelling: domain names provided here will be whitelisted on
-    /// the client side (resolved via local DNS, bypassing the VPN).
+    /// Split-tunnelling: domains/IPs resolved once by the server at startup;
+    /// authenticated IP literals bypass the VPN on clients (no client DNS).
     #[arg(long, env = "VPN_WHITELIST_DOMAINS", value_delimiter = ',', num_args = 0..)]
     pub whitelist_domains: Vec<String>,
 
@@ -239,11 +239,21 @@ impl Config {
     }
 
     pub fn validate(&self) -> Result<(), String> {
-        if !self.keycloak_enabled && self.auth_token.as_deref().is_none_or(str::is_empty) {
-            return Err(
-                "VPN_AUTH_TOKEN / --auth-token is required when Keycloak auth is disabled"
-                    .to_string(),
-            );
+        if !self.keycloak_enabled {
+            let token = self.auth_token.as_deref().map_or("", str::trim);
+            if token.is_empty() {
+                return Err(
+                    "VPN_AUTH_TOKEN / --auth-token is required when Keycloak auth is disabled"
+                        .to_string(),
+                );
+            }
+            if is_placeholder_token(token) {
+                return Err(
+                    "VPN_AUTH_TOKEN / --auth-token is still the documented placeholder; \
+                     set a long random value (e.g. `openssl rand -hex 32`)"
+                        .to_string(),
+                );
+            }
         }
         if !self.keycloak_enabled
             && (self.keycloak_required_role.is_some() || self.keycloak_required_scope.is_some())
@@ -275,6 +285,14 @@ impl Config {
         }
         Ok(())
     }
+}
+
+/// Placeholder tokens from the docs and examples. `entrypoint.sh` rejects the
+/// same values, but bare-metal deployments never run it.
+fn is_placeholder_token(token: &str) -> bool {
+    ["change_me", "change-me", "changeme"]
+        .iter()
+        .any(|placeholder| token.eq_ignore_ascii_case(placeholder))
 }
 
 #[cfg(test)]

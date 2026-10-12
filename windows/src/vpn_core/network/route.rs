@@ -144,28 +144,8 @@ fn apply_ipv6_prefix_policy_with_runner(
     prefix: &str,
     persist: bool,
 ) -> bool {
-    let set_ok = runner.run_cmd(
-        "netsh",
-        &[
-            "interface",
-            "ipv6",
-            "set",
-            "prefixpolicy",
-            &format!("prefix={prefix}"),
-            "precedence=100",
-            "label=13",
-            "store=active",
-        ],
-    );
-
-    if set_ok {
-        if persist {
-            persist_prefix_policy(prefix);
-        }
-        info!("Applied IPv6 prefix policy with set: {}", prefix);
-        return true;
-    }
-
+    // Add-only: an existing administrator/other VPN policy must remain intact.
+    // Only a successfully created entry belongs to our cleanup record.
     let add_ok = runner.run_cmd(
         "netsh",
         &[
@@ -186,7 +166,10 @@ fn apply_ipv6_prefix_policy_with_runner(
         }
         info!("Applied IPv6 prefix policy with add: {}", prefix);
     } else {
-        warn!("Failed to apply IPv6 prefix policy: {}", prefix);
+        warn!(
+            "IPv6 prefix policy already exists or could not be added; leaving it unchanged: {}",
+            prefix
+        );
     }
 
     add_ok
@@ -203,16 +186,16 @@ pub fn cleanup_ipv6_prefix_policy() {
                 "delete",
                 "prefixpolicy",
                 &format!("prefix={prefix}"),
+                "store=active",
             ],
         );
 
         if ok {
             info!("Removed MaviVPN IPv6 prefix policy: {}", prefix);
+            clear_persisted_prefix_policy();
         } else {
             warn!("Failed to remove MaviVPN IPv6 prefix policy: {}", prefix);
         }
-
-        clear_persisted_prefix_policy();
     }
 }
 
@@ -285,7 +268,7 @@ mod tests {
     }
 
     #[test]
-    fn prefix_policy_uses_set_command_first() {
+    fn prefix_policy_adds_without_overwriting_existing_entries() {
         let runner = RecordingRunner::with_results(vec![true]);
 
         assert!(apply_ipv6_prefix_policy_with_runner(
@@ -301,7 +284,7 @@ mod tests {
                 args: vec![
                     "interface",
                     "ipv6",
-                    "set",
+                    "add",
                     "prefixpolicy",
                     "prefix=fd00::/64",
                     "precedence=100",
@@ -332,7 +315,7 @@ mod tests {
                 args: vec![
                     "interface",
                     "ipv6",
-                    "set",
+                    "add",
                     "prefixpolicy",
                     "prefix=fd00::/64",
                     "precedence=100",
@@ -347,30 +330,16 @@ mod tests {
     }
 
     #[test]
-    fn prefix_policy_falls_back_to_add_when_set_fails() {
+    fn existing_prefix_policy_is_never_modified_or_claimed() {
         let runner = RecordingRunner::with_results(vec![false, true]);
-
-        assert!(apply_ipv6_prefix_policy_with_runner(
-            &runner,
-            "fd00::/64",
-            false
-        ));
-
-        let commands = runner.commands();
-        assert_eq!(commands.len(), 2);
-        assert_eq!(command_args(&commands[0])[2], "set");
-        assert_eq!(command_args(&commands[1])[2], "add");
-    }
-
-    #[test]
-    fn prefix_policy_reports_failure_when_set_and_add_fail() {
-        let runner = RecordingRunner::with_results(vec![false, false]);
-
         assert!(!apply_ipv6_prefix_policy_with_runner(
             &runner,
             "fd00::/64",
             false
         ));
+        let commands = runner.commands();
+        assert_eq!(commands.len(), 1);
+        assert_eq!(command_args(&commands[0])[2], "add");
     }
 
     fn command_args(command: &RecordedCommand) -> &[String] {

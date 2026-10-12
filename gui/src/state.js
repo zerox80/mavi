@@ -10,12 +10,14 @@ export const state = {
   serviceAvailable: false,
   running: false,
   activeEndpoint: null,
+  sessionConnection: null, // Snapshot of the profile used for this session.
   vpnState: 'Stopped',
   lastError: null,
   // Session wall clock
   sessionStart: null,
+  // Startup blocks persistence until load_prefs succeeds.
+  prefsWriteBlocked: true,
   // Saved UI prefs
-  prefsLoaded: false,
   prefs: {
     theme: 'light',
     accent: '#2B44FF',

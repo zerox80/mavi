@@ -40,9 +40,18 @@ internal fun resolveVpnStartRequest(
 private fun savedVpnStartRequest(prefs: PrefsManager): VpnStartRequest {
     Log.i("MaviVPN", "Service restarted by System. Reloading credentials...")
     // Normal mode keeps its credential in savedPresharedKey, Keycloak mode in
-    // savedToken. Pick the slot for the active mode so a system restart
+    // an authority-bound record. Pick the active mode so a system restart
     // reconnects with the matching credential.
-    val token = if (prefs.savedUseKeycloak) prefs.savedToken else prefs.savedPresharedKey
+    val token =
+        if (prefs.savedUseKeycloak) {
+            prefs.keycloak
+                .snapshot()
+                .tokens
+                ?.accessToken
+                .orEmpty()
+        } else {
+            prefs.savedPresharedKey
+        }
     return VpnStartRequest(
         ip = prefs.savedIp,
         port = prefs.savedPort,
@@ -68,12 +77,13 @@ private fun connectVpnStartRequest(
     prefs.savedPort = port
     val resolvedToken: String
     if (prefs.savedUseKeycloak) {
-        // The worker thread may already hold a fresher access token; only seed
-        // savedToken from the intent when it is currently empty.
-        if (token.isNotBlank() && prefs.savedToken.isBlank()) {
-            prefs.savedToken = token
-        }
-        resolvedToken = prefs.savedToken
+        // An intent token has no proven issuer and must not seed OAuth storage.
+        resolvedToken =
+            prefs.keycloak
+                .snapshot()
+                .tokens
+                ?.accessToken
+                .orEmpty()
     } else {
         prefs.savedPresharedKey = token
         resolvedToken = token
@@ -97,7 +107,9 @@ internal fun vpnStartHasCredentials(
     currentToken: String,
 ): Boolean =
     if (prefs.savedUseKeycloak) {
-        currentToken.isNotEmpty() || prefs.savedRefreshToken.isNotBlank()
+        prefs.keycloak.snapshot().tokens?.let {
+            it.accessToken.isNotEmpty() || it.refreshToken.isNotBlank()
+        } == true
     } else {
         currentToken.isNotEmpty()
     }

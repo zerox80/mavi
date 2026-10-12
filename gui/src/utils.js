@@ -20,16 +20,6 @@ export function initials(label) {
   return s.toUpperCase();
 }
 
-export function bandwidthWalk(n, seed = 42) {
-  const out = [];
-  let x = seed;
-  for (let i = 0; i < n; i++) {
-    x = (x * 9301 + 49297) % 233280;
-    out.push(0.3 + 0.55 * (x / 233280) + 0.15 * Math.sin(i / 4));
-  }
-  return out;
-}
-
 export function friendlyError(e) {
   const s = String(e);
   if (

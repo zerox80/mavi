@@ -6,6 +6,7 @@ import { parseOptionalMtu } from './utils.js';
 
 let _applyHero = null;
 let _editingId = null;
+let _saving = false;
 
 // Light format checks so a typo is caught immediately in the form instead of
 // surfacing later as an opaque connection failure. Not a security boundary -
@@ -50,6 +51,7 @@ export function updateModalAuthFields() {
 }
 
 export function openModal(id) {
+  if (_saving) return;
   _editingId = id;
   const existing = id ? state.prefs.connections.find((c) => c.id === id) : null;
   $('modal-title').textContent = existing ? 'Edit Connection' : 'New Connection';
@@ -73,11 +75,13 @@ export function openModal(id) {
 }
 
 export function closeModal() {
+  if (_saving) return;
   $('modal-backdrop').classList.remove('visible');
   _editingId = null;
 }
 
 export async function saveModal() {
+  if (_saving) return;
   const label = $('m_label').value.trim();
   const endpoint = $('m_endpoint').value.trim();
   const token = $('m_token').value.trim();
@@ -125,26 +129,38 @@ export async function saveModal() {
     vpn_mtu: mtu.value,
   };
 
-  if (_editingId) {
-    const idx = state.prefs.connections.findIndex((c) => c.id === _editingId);
-    if (idx >= 0) state.prefs.connections[idx] = conn;
-  } else {
-    state.prefs.connections.push(conn);
-    state.prefs.active_id = conn.id;
-  }
-  await savePrefs();
-  closeModal();
-  renderConnectionList();
-  if (_applyHero) _applyHero();
-  showToast('Connection saved.', 'success');
+  const connections = _editingId
+    ? state.prefs.connections.map((c) => c.id === _editingId ? conn : c)
+    : [...state.prefs.connections, conn];
+  await persistModal({ ...state.prefs, connections,
+    active_id: _editingId ? state.prefs.active_id : conn.id }, 'Connection saved.');
 }
 
 export async function deleteModal() {
-  if (!_editingId) return;
-  state.prefs.connections = state.prefs.connections.filter((c) => c.id !== _editingId);
-  if (state.prefs.active_id === _editingId) state.prefs.active_id = null;
-  await savePrefs();
+  if (!_editingId || _saving) return;
+  await persistModal({ ...state.prefs,
+    connections: state.prefs.connections.filter((c) => c.id !== _editingId),
+    active_id: state.prefs.active_id === _editingId ? null : state.prefs.active_id,
+  }, 'Connection deleted.');
+}
+
+async function persistModal(prefs, message) {
+  _saving = true;
+  $('modal-save').disabled = true;
+  $('modal-delete').disabled = true;
+  try {
+    await savePrefs(prefs);
+    state.prefs = prefs;
+  } catch {
+    showToast('Could not save connections. Your changes have not been saved. Please try again.', 'error');
+    return;
+  } finally {
+    _saving = false;
+    $('modal-save').disabled = false;
+    $('modal-delete').disabled = false;
+  }
   closeModal();
   renderConnectionList();
   if (_applyHero) _applyHero();
+  showToast(message, 'success');
 }

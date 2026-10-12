@@ -12,7 +12,6 @@ import android.util.Log
 import com.mavi.vpn.data.PrefsManager
 import com.mavi.vpn.nativelib.NativeLib
 import com.mavi.vpn.service.NotificationHelper
-import kotlinx.coroutines.flow.MutableStateFlow
 
 class MaviVpnService : VpnService() {
     private var vpnInterface: ParcelFileDescriptor? = null
@@ -37,7 +36,8 @@ class MaviVpnService : VpnService() {
     private lateinit var tokenManager: KeycloakTokenManager
 
     companion object {
-        val isConnected = MutableStateFlow(false)
+        private val connectionStatus = VpnConnectionStatus()
+        val connectionState = connectionStatus.state
     }
 
     override fun onCreate() {
@@ -86,16 +86,20 @@ class MaviVpnService : VpnService() {
         acquireWakeLock()
 
         isRunning = true
+        connectionStatus.start()
         startForeground(1, notification)
 
         val callbacks =
             VpnSessionCallbacks(
                 isRunning = { isRunning && handleRegistry.isCurrent(sessionGeneration) },
                 setRunning = { value ->
-                    handleRegistry.withCurrent(sessionGeneration) { isRunning = value }
+                    handleRegistry.withCurrent(sessionGeneration) {
+                        isRunning = value
+                        if (!value) connectionStatus.stop()
+                    }
                 },
                 setConnected = { value ->
-                    handleRegistry.withCurrent(sessionGeneration) { isConnected.value = value }
+                    handleRegistry.withCurrent(sessionGeneration) { connectionStatus.connected(value) }
                 },
                 attachInterface = { localInterface ->
                     handleRegistry.withCurrent(sessionGeneration) { attachVpnInterface(localInterface) }
@@ -184,7 +188,7 @@ class MaviVpnService : VpnService() {
                 NativeLib.stop(invalidation.previousHandle)
             }
             isRunning = false
-            isConnected.value = false
+            connectionStatus.stop()
             val cleanup =
                 SessionCleanup(
                     handle = invalidation.previousHandle,

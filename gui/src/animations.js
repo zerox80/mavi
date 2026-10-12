@@ -1,5 +1,4 @@
 import { state, $ } from './state.js';
-import { bandwidthWalk } from './utils.js';
 
 export function startCoreAnimation() {
   const svg = $('core');
@@ -166,47 +165,12 @@ export function startCoreAnimation() {
   requestAnimationFrame(loop);
 }
 
-export function renderSparkline() {
-  const svg = $('sparkline');
-  if (!svg) return;
-  const W = 200,
-    H = 28;
-  const values = bandwidthWalk(60);
-  const max = Math.max(...values);
-  const points = values
-    .map((v, i) => {
-      const x = (i / (values.length - 1)) * W;
-      const y = H - (v / max) * H * 0.9 - 2;
-      return `${x.toFixed(1)},${y.toFixed(1)}`;
-    })
-    .join(' ');
-  svg.innerHTML = `
-    <polyline id="spark-line" points="${points}" fill="none" stroke-width="1.2" />
-    <polygon  id="spark-fill" points="0,${H} ${points} ${W},${H}" />
-  `;
-  updateSparklineColors();
-}
-
-export function updateSparklineColors() {
-  const line = document.getElementById('spark-line');
-  const fill = document.getElementById('spark-fill');
-  if (!line || !fill) return;
-  const style = getComputedStyle(document.documentElement);
-  const off = state.hero !== 'on';
-  const accent = state.prefs.accent || style.getPropertyValue('--accent').trim() || '#2B44FF';
-  const lineColor = off ? style.getPropertyValue('--line').trim() : accent;
-  line.setAttribute('stroke', lineColor);
-  fill.setAttribute('fill', accent);
-  fill.setAttribute('opacity', off ? '0' : '0.08');
-}
-
 export function startStatsAnimation() {
-  let tick = 0;
   setInterval(() => {
     if (state.hero === 'on') {
-      tick++;
-      $('stat-down').textContent = (42 + (tick % 7) * 3.1).toFixed(1);
-      $('stat-up').textContent = (11 + (tick % 5) * 1.4).toFixed(1);
+      // The IPC status does not provide byte counters yet. Never invent rates.
+      $('stat-down').textContent = '—';
+      $('stat-up').textContent = '—';
     } else {
       $('stat-down').textContent = '0.0';
       $('stat-up').textContent = '0.0';
