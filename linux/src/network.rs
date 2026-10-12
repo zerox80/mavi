@@ -303,6 +303,28 @@ fn resolve_endpoint_route(
     routes::resolve_host_route(runner, endpoint)
 }
 
+/// Recover crashed direct sessions before any DNS-dependent startup work.
+/// An existing tunnel belongs to another running session and must be preserved.
+pub fn prepare_direct_connection() -> Result<()> {
+    prepare_direct_connection_with(
+        std::path::Path::new("/sys/class/net/mavi0").exists(),
+        cleanup_stale_network_state,
+    )
+}
+
+fn prepare_direct_connection_with(
+    tunnel_exists: bool,
+    recover: impl FnOnce() -> Result<()>,
+) -> Result<()> {
+    anyhow::ensure!(
+        !tunnel_exists,
+        "mavi0 already exists; stop the active Mavi VPN connection before starting direct mode"
+    );
+    // DNS recovery must precede loading OAuth credentials or resolving the
+    // endpoint. A crashed session may have left a VPN-only nameserver behind.
+    recover()
+}
+
 /// Best-effort cleanup for daemon repair requests and stale state after crashes.
 /// This intentionally tolerates missing routes or DNS backups.
 pub fn cleanup_stale_network_state() -> Result<()> {
@@ -350,3 +372,7 @@ mod tests;
 #[cfg(test)]
 #[path = "network/kernel_tests.rs"]
 mod kernel_tests;
+
+#[cfg(test)]
+#[path = "network/startup_tests.rs"]
+mod startup_tests;

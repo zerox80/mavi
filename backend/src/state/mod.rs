@@ -201,12 +201,18 @@ impl AppState {
         &self,
         principal: String,
         limit: usize,
-    ) -> Result<(Ipv4Addr, Ipv6Addr)> {
+        ipv6_enabled: bool,
+    ) -> Result<(Ipv4Addr, Option<Ipv6Addr>)> {
         let permit = self
             .principal_quota
             .try_acquire(principal, limit)
             .ok_or_else(|| anyhow!("VPN session limit reached for principal"))?;
-        let (ip4, ip6) = self.assign_ip_pair()?;
+        let (ip4, ip6) = if ipv6_enabled {
+            let (ip4, ip6) = self.assign_ip_pair()?;
+            (ip4, Some(ip6))
+        } else {
+            (self.assign_ip()?, None)
+        };
         self.principal_leases
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner)
@@ -253,22 +259,29 @@ impl AppState {
     /// connection dropped before `register_client`, or the TUN reader removed the
     /// peer first) is still returned to the pool. Releasing the same address
     /// twice is a no-op, so this cannot corrupt the pool with duplicates.
-    pub fn release_ips(&self, ip4: Ipv4Addr, ip6: Ipv6Addr) {
+    pub fn release_ips(&self, ip4: Ipv4Addr, ip6: impl Into<Option<Ipv6Addr>>) {
+        let ip6 = ip6.into();
         // Best-effort routing cleanup; reclaim no longer depends on its result.
         self.peers.remove(&ip4);
-        self.peers_v6.remove(&ip6);
+        if let Some(ip6) = ip6 {
+            self.peers_v6.remove(&ip6);
+        }
         self.principal_leases
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner)
             .remove(&ip4);
         self.reclaim_ipv4(ip4);
-        self.reclaim_ipv6(ip6);
+        if let Some(ip6) = ip6 {
+            self.reclaim_ipv6(ip6);
+        }
     }
 
     /// Associates an IPv4/IPv6 pair with an async sender channel for a connected client.
-    pub fn register_client(&self, ip4: Ipv4Addr, ip6: Ipv6Addr, tx: ClientTx) {
+    pub fn register_client(&self, ip4: Ipv4Addr, ip6: impl Into<Option<Ipv6Addr>>, tx: ClientTx) {
         self.peers.insert(ip4, tx.clone());
-        self.peers_v6.insert(ip6, tx);
+        if let Some(ip6) = ip6.into() {
+            self.peers_v6.insert(ip6, tx);
+        }
     }
 
     /// Returns the server's internal IPv4 address (the VPN Gateway).

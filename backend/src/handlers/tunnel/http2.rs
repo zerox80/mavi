@@ -93,7 +93,7 @@ pub async fn run_http2_tunnel(
     state: Arc<AppState>,
     tx_tun: mpsc::Sender<Bytes>,
     assigned_ip: Ipv4Addr,
-    assigned_ip6: Ipv6Addr,
+    assigned_ip6: Option<Ipv6Addr>,
     tunnel_mtu: u16,
     session_expiry: Option<i64>,
     session_subject: Option<String>,
@@ -185,7 +185,7 @@ fn forward_packet(
     payload: &[u8],
     tunnel_mtu: u16,
     assigned_ip: Ipv4Addr,
-    assigned_ip6: Ipv6Addr,
+    assigned_ip6: impl Into<Option<Ipv6Addr>>,
     tx_tun: &mpsc::Sender<Bytes>,
 ) -> Result<()> {
     let Some(packet) = masque::decode_connect_ip_datagram_payload(payload) else {

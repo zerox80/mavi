@@ -119,7 +119,7 @@ pub(super) async fn run_authenticated_tunnel(
     state: Arc<AppState>,
     tx_tun: tokio::sync::mpsc::Sender<Bytes>,
     assigned_ip: std::net::Ipv4Addr,
-    assigned_ip6: std::net::Ipv6Addr,
+    assigned_ip6: Option<std::net::Ipv6Addr>,
     session_expiry: Option<i64>,
     session_subject: Option<String>,
     mtu: u16,
@@ -175,20 +175,18 @@ pub(super) fn build_config_message(
     state: &AppState,
     config: &Config,
     assigned_ip: std::net::Ipv4Addr,
-    assigned_ip6: std::net::Ipv6Addr,
+    assigned_ip6: impl Into<Option<std::net::Ipv6Addr>>,
     ipv6_enabled: bool,
 ) -> ControlMessage {
+    let assigned_ipv6 = assigned_ip6.into().filter(|_| ipv6_enabled);
+    let ipv6_enabled = assigned_ipv6.is_some();
     ControlMessage::Config {
         assigned_ip,
         netmask: state.network.mask(),
         gateway: state.gateway_ip(),
         dns_server: config.dns,
         mtu: config.mtu,
-        assigned_ipv6: if ipv6_enabled {
-            Some(assigned_ip6)
-        } else {
-            None
-        },
+        assigned_ipv6,
         netmask_v6: if ipv6_enabled {
             Some(state.network_v6.prefix())
         } else {
@@ -376,6 +374,7 @@ async fn handle_established_connection(
             &state,
             &config,
             crate::handlers::auth::as_token_validator(keycloak.as_ref()),
+            ipv6_enabled,
         )
         .await
     }
@@ -418,7 +417,7 @@ async fn handle_established_connection(
     let _ = send_stream.finish();
 
     info!(
-        "Authenticated {} | SNI: {} -> IPv4: {}, IPv6: {}",
+        "Authenticated {} | SNI: {} -> IPv4: {}, IPv6: {:?}",
         remote_addr,
         sni.as_deref().unwrap_or("<none>"),
         assigned_ip,

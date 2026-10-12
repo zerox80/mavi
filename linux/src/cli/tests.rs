@@ -2,6 +2,37 @@ use super::handle_action_response;
 use shared::ipc::{IpcResponse, VpnState};
 
 #[test]
+fn advertised_config_options_dispatch_direct_connections_with_the_selected_file() {
+    for command in [None, Some("connect"), Some("up")] {
+        for option in ["-c", "--config"] {
+            let mut args = Vec::new();
+            if let Some(command) = command {
+                args.push(command.to_owned());
+            }
+            args.extend([option.to_owned(), "/tmp/saved-vpn.json".to_owned()]);
+            assert!(matches!(super::command_name(&args), "connect" | "up"));
+            assert_eq!(
+                super::config_path(&args).unwrap(),
+                Some(std::path::PathBuf::from("/tmp/saved-vpn.json"))
+            );
+        }
+    }
+    for command in ["start", "stop", "daemon", "status", "repair", "--help"] {
+        assert_eq!(super::command_name(&[command.into()]), command);
+    }
+}
+
+#[test]
+fn missing_config_option_values_fail_instead_of_prompting_for_another_connection() {
+    for args in [
+        vec!["-c".into()],
+        vec!["connect".into(), "--config".into(), "--help".into()],
+    ] {
+        assert!(super::config_path(&args).is_err());
+    }
+}
+
+#[test]
 fn unknown_repair_options_fail_before_any_network_changes() {
     for args in [
         vec!["--legacy".into()],
