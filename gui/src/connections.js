@@ -1,6 +1,7 @@
 import { state, $ } from './state.js';
 import { savePrefs } from './theme.js';
 import { escapeHtml, initials } from './utils.js';
+import { showToast } from './toast.js';
 
 let _openModal = null;
 let _applyHero = null;
@@ -47,8 +48,9 @@ export function renderConnectionList() {
   for (const c of filtered) {
     const row = document.createElement('div');
     const isSelected = c.id === state.prefs.active_id;
-    const isActive = isSelected && state.hero === 'on';
-    const isConnecting = isSelected && state.hero === 'connecting';
+    const isSession = c.id === state.sessionConnection?.id;
+    const isActive = isSession && state.hero === 'on';
+    const isConnecting = isSession && state.hero === 'connecting';
     row.className =
       'conn-row' +
       (isSelected ? ' selected' : '') +
@@ -74,8 +76,14 @@ export function renderConnectionList() {
 }
 
 export async function selectConnection(id) {
+  const previous = state.prefs.active_id;
   state.prefs.active_id = id;
-  await savePrefs();
+  try {
+    await savePrefs();
+  } catch {
+    state.prefs.active_id = previous;
+    showToast('Could not save the selected connection. Please try again.', 'error');
+  }
   renderConnectionList();
   if (_applyHero) _applyHero();
 }
@@ -112,6 +120,8 @@ export function connectionFromLegacyConfig(config, existing = null) {
 export async function migrateLegacyConfig(config) {
   if (state.prefs.legacy_config_migrated) return;
 
+  const previous = { ...state.prefs, connections: [...state.prefs.connections] };
+
   state.prefs.legacy_config_migrated = true;
   if (config?.endpoint) {
     const idx = state.prefs.connections.findIndex((c) => c.endpoint === config.endpoint);
@@ -128,5 +138,10 @@ export async function migrateLegacyConfig(config) {
     }
   }
 
-  await savePrefs();
+  try {
+    await savePrefs();
+  } catch (error) {
+    state.prefs = previous;
+    throw error;
+  }
 }

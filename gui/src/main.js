@@ -12,10 +12,8 @@ import {
 } from './vpn.js';
 import {
   startCoreAnimation,
-  renderSparkline,
   startStatsAnimation,
   startSessionClock,
-  updateSparklineColors,
 } from './animations.js';
 import { showToast } from './toast.js';
 
@@ -26,6 +24,8 @@ import { showToast } from './toast.js';
 document.addEventListener('DOMContentLoaded', async () => {
   await bootstrapTauri();
 
+  state.prefsWriteBlocked = true;
+
   wireTabs();
   wireSidebarSearch({ openModal, applyHeroForSelection });
   wireModal({ applyHeroForSelection });
@@ -33,19 +33,19 @@ document.addEventListener('DOMContentLoaded', async () => {
   wireThemeToggle();
   wireShortcuts();
 
-  // Keep persistence disabled until saved profiles and their secrets are loaded.
+  // Only enable writes after the saved profiles and secrets were read successfully.
   try {
     const prefs = await invoke('load_prefs');
-    if (!prefs) throw new Error('Preferences were not returned by the backend.');
+    if (!prefs) throw new Error('No preferences returned by backend');
     state.prefs = normalizePrefs(prefs);
-    state.prefsLoaded = true;
+    state.prefsWriteBlocked = false;
   } catch (e) {
     console.warn('load_prefs failed:', e);
-    showToast('Saved profiles could not be loaded. Saving is disabled; restart to retry.', 'error');
+    showToast('Could not load saved connections. Restart the app to retry.', 'error');
   }
 
   // One-time migration from the old editable runtime config into saved connections.
-  if (state.prefsLoaded) {
+  if (!state.prefsWriteBlocked) {
     try {
       const config = await invoke('load_config');
       await migrateLegacyConfig(config);
@@ -58,7 +58,6 @@ document.addEventListener('DOMContentLoaded', async () => {
   renderConnectionList();
 
   startCoreAnimation();
-  renderSparkline();
   startStatsAnimation();
   startSessionClock();
 
@@ -119,9 +118,3 @@ function wireShortcuts() {
     }
   });
 }
-
-// Re-tint sparkline when state changes — hook into setHero via MutationObserver
-new MutationObserver(updateSparklineColors).observe(document.documentElement, {
-  attributes: true,
-  attributeFilter: ['data-state', 'data-theme'],
-});

@@ -38,7 +38,6 @@ describe('main startup workflow', () => {
     const refreshStatus = vi.fn(() => Promise.resolve());
     const applyStatus = vi.fn();
     const toggleConnection = vi.fn();
-    const updateSparklineColors = vi.fn();
 
     vi.doMock('../api.js', () => ({
       bootstrapTauri: vi.fn(() => Promise.resolve(true)),
@@ -68,10 +67,8 @@ describe('main startup workflow', () => {
     }));
     vi.doMock('../animations.js', () => ({
       startCoreAnimation: vi.fn(),
-      renderSparkline: vi.fn(),
       startStatsAnimation: vi.fn(),
       startSessionClock: vi.fn(),
-      updateSparklineColors,
     }));
 
     await import('../main.js');
@@ -120,19 +117,16 @@ describe('main startup workflow', () => {
     document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
     expect(cancelClick).toHaveBeenCalledOnce();
 
-    document.documentElement.setAttribute('data-theme', 'dark');
-    await new Promise((resolve) => setTimeout(resolve, 0));
-    expect(updateSparklineColors).toHaveBeenCalled();
   });
 
-  it('skips migration after a prefs error while continuing status and event setup', async () => {
+  it('skips migration and blocks writes when loading preferences fails', async () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
-    const invoke = vi.fn((command) => {
-      if (command === 'load_prefs') return Promise.reject(new Error('prefs offline'));
-      return Promise.resolve({ endpoint: 'vpn.example.com:443', token: 'legacy-secret' });
-    });
-    const migrateLegacyConfig = vi.fn();
+    const invoke = vi
+      .fn()
+      .mockRejectedValueOnce(new Error('prefs offline'))
+      .mockRejectedValueOnce(new Error('config offline'));
     const listen = vi.fn(() => Promise.reject(new Error('events offline')));
+    const migrateLegacyConfig = vi.fn();
     const applyTheme = vi.fn();
     const renderConnectionList = vi.fn();
     const refreshStatus = vi.fn(() => Promise.resolve());
@@ -165,10 +159,8 @@ describe('main startup workflow', () => {
     }));
     vi.doMock('../animations.js', () => ({
       startCoreAnimation: vi.fn(),
-      renderSparkline: vi.fn(),
       startStatsAnimation: vi.fn(),
       startSessionClock: vi.fn(),
-      updateSparklineColors: vi.fn(),
     }));
 
     await import('../main.js');
@@ -180,11 +172,10 @@ describe('main startup workflow', () => {
     expect(renderConnectionList).toHaveBeenCalled();
     expect(refreshStatus).toHaveBeenCalled();
     expect(warn).toHaveBeenCalledWith('load_prefs failed:', expect.any(Error));
-    expect(invoke).not.toHaveBeenCalledWith('load_config');
+    expect(invoke).toHaveBeenCalledTimes(1);
     expect(migrateLegacyConfig).not.toHaveBeenCalled();
     const { state } = await import('../state.js');
-    expect(state.prefsLoaded).toBe(false);
-    expect(state.prefs.legacy_config_migrated).toBe(false);
+    expect(state.prefsWriteBlocked).toBe(true);
     expect(warn).toHaveBeenCalledWith('event wiring failed:', expect.any(Error));
   });
 });

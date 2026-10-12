@@ -196,9 +196,25 @@ jobs:
           name: refreshed-fork-lockfile
           path: .
       - name: Commit and push refreshed lockfile
+        env:
+          GIT_AUTHOR_NAME: zerox80
+          GIT_AUTHOR_EMAIL: 115537871+zerox80@users.noreply.github.com
+          GIT_COMMITTER_NAME: zerox80
+          GIT_COMMITTER_EMAIL: 115537871+zerox80@users.noreply.github.com
         run: |
-          git config user.name "zerox80"
-          git config user.email "rujbin@protonmail.com"
+          git config --local user.name "$GIT_AUTHOR_NAME"
+          git config --local user.email "$GIT_AUTHOR_EMAIL"
+          verify_commit_identity() {
+            expected="$GIT_AUTHOR_NAME <$GIT_AUTHOR_EMAIL>"
+            test "$(git log -1 --format='%an <%ae>')" = "$expected"
+            test "$(git log -1 --format='%cn <%ce>')" = "$expected"
+          }
+          for identity in GIT_AUTHOR_IDENT GIT_COMMITTER_IDENT; do
+            case "$(git var "$identity")" in
+              "$GIT_AUTHOR_NAME <$GIT_AUTHOR_EMAIL> "*) ;;
+              *) echo "::error::Unexpected commit identity"; exit 1 ;;
+            esac
+          done
           git add Cargo.lock
 
           previous_head="$(git rev-parse HEAD)"
@@ -215,12 +231,14 @@ jobs:
                 --force-with-lease="refs/heads/main:$previous_head" \
                 origin HEAD^:main
             else
-              git commit --amend --no-edit
+              git commit --amend --no-edit --reset-author
+              verify_commit_identity
               git push \
                 --force-with-lease="refs/heads/main:$previous_head" \
                 origin HEAD:main
             fi
           else
             git commit -m "$FORK_UPDATE_COMMIT_MESSAGE"
+            verify_commit_identity
             git push origin HEAD:main
           fi

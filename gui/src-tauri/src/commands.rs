@@ -100,7 +100,12 @@ pub(crate) async fn vpn_connect(
     };
 
     #[cfg(not(target_os = "windows"))]
-    let request = IpcRequest::Start(config);
+    let session_id = format!("{:032x}", rand::random::<u128>());
+    #[cfg(not(target_os = "windows"))]
+    let request = IpcRequest::StartScoped {
+        session_id: session_id.clone(),
+        config,
+    };
 
     let response = match send_ipc_request(&request).await {
         Ok(response) => response,
@@ -117,6 +122,8 @@ pub(crate) async fn vpn_connect(
 
     match response {
         IpcResponse::Ok => {
+            // Every accepted replacement, including PSK, retires the old ticker.
+            stop_token_refresh_ticker(&app);
             if let Err(error) = attempt.accept() {
                 // Start may already have reached the service. Finish its stop
                 // while holding the operation lock, before any new start.
@@ -144,7 +151,7 @@ pub(crate) async fn vpn_connect(
                     start_service_refresh_token_sync(&app);
                 }
                 #[cfg(not(target_os = "windows"))]
-                start_token_refresh_ticker(&app, session);
+                start_token_refresh_ticker(&app, session, session_id);
             }
             Ok("Connected".into())
         }

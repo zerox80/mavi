@@ -125,6 +125,12 @@ async fn dispatch_as(
         return ipc::IpcResponse::Error("Unauthorized: inactive IPC caller".into());
     }
     match req {
+        ipc::IpcRequest::StartScoped { .. }
+        | ipc::IpcRequest::SessionStatus { .. }
+        | ipc::IpcRequest::UpdateSessionToken { .. }
+        | ipc::IpcRequest::StopSession { .. } => {
+            ipc::IpcResponse::Error("GUI-managed scoped refresh is only supported on Linux".into())
+        }
         ipc::IpcRequest::Status => {
             let snapshot = guard.status_snapshot();
             let state = classify_status(

@@ -47,6 +47,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.mavi.vpn.VpnConnectionState
 import com.mavi.vpn.OAuthHelper
 import com.mavi.vpn.ui.components.MaviCore
 import com.mavi.vpn.ui.components.MaviCoreState
@@ -63,7 +64,8 @@ fun VpnScreen(
     onOpenSettings: () -> Unit,
 ) {
     val context = LocalContext.current
-    val isConnected by viewModel.isConnected.collectAsState()
+    val connectionState by viewModel.connectionState.collectAsState()
+    val isConnected = connectionState == VpnConnectionState.CONNECTED
     
     val useKeycloak by viewModel.useKeycloak.collectAsState()
 
@@ -73,7 +75,7 @@ fun VpnScreen(
 
         val prefs = com.mavi.vpn.data.PrefsManager(viewModel.getApplication())
         while (true) {
-            val freshToken = prefs.savedToken
+            val freshToken = prefs.keycloak.snapshot().tokens?.accessToken.orEmpty()
             if (freshToken != viewModel.authToken.value) {
                 viewModel.authToken.value = freshToken
             }
@@ -102,7 +104,7 @@ fun VpnScreen(
                 "home" ->
                     HomeView(
                         viewModel = viewModel,
-                        isConnected = isConnected,
+                        connectionState = connectionState,
                         onConnect = onConnect,
                         onDisconnect = onDisconnect,
                         onOpenSettings = onOpenSettings,

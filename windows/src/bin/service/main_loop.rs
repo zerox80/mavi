@@ -23,8 +23,6 @@ pub async fn run_service_loop(
 ) -> anyhow::Result<()> {
     let state = Arc::new(Mutex::new(VpnServiceState::new()));
 
-    run_network_repair_cleanup();
-
     // Generate secure token for IPC and save it securely BEFORE serving the
     // named pipe.
     let (auth_token, _token_bytes) = build_auth_token();
@@ -32,6 +30,10 @@ pub async fn run_service_loop(
     let token_path = ipc::ipc_token_path();
     prepare_ipc_auth_token(&token_path, &auth_token)?;
     info!("Auth token generated, saved, and hardened");
+
+    // Recovery files share the token directory. Validate its owner and harden
+    // its ACL before privileged cleanup consumes any persisted network state.
+    run_network_repair_cleanup();
 
     info!("Service listening for IPC on {}", ipc::ipc_pipe_name());
 

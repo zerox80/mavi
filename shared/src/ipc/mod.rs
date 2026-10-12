@@ -17,6 +17,8 @@ use std::fmt;
 
 mod transport;
 #[cfg(windows)]
+pub mod windows_server;
+#[cfg(windows)]
 pub use transport::ipc_pipe_name;
 #[cfg(unix)]
 pub use transport::ipc_socket_path;
@@ -177,6 +179,15 @@ pub enum IpcRequest {
     /// Fetch a rotated refresh token awaiting persistence. Kept under its
     /// original wire tag, but fetching no longer clears the pending update.
     TakeRefreshTokenUpdate,
+    /// Start a session whose GUI refresh requests carry a fresh per-start ID.
+    /// Appended variants preserve the existing positional IPC wire format.
+    StartScoped { session_id: String, config: Config },
+    /// Query only the named, still-running session (including reconnects).
+    SessionStatus { session_id: String },
+    /// Refresh only the named session, atomically with the ownership check.
+    UpdateSessionToken { session_id: String, token: String },
+    /// Stop only the named session; a stale ticker cannot stop its successor.
+    StopSession { session_id: String },
     /// Confirm that this exact update was saved. A stale acknowledgement must
     /// not clear a newer rotation for the same connection. Append wire variants.
     AcknowledgeRefreshTokenUpdate {
@@ -202,6 +213,24 @@ impl fmt::Debug for IpcRequest {
                 .field("keycloak", keycloak)
                 .finish(),
             Self::TakeRefreshTokenUpdate => f.write_str("TakeRefreshTokenUpdate"),
+            Self::StartScoped { session_id, config } => f
+                .debug_struct("StartScoped")
+                .field("session_id", session_id)
+                .field("config", config)
+                .finish(),
+            Self::SessionStatus { session_id } => f
+                .debug_struct("SessionStatus")
+                .field("session_id", session_id)
+                .finish(),
+            Self::UpdateSessionToken { session_id, .. } => f
+                .debug_struct("UpdateSessionToken")
+                .field("session_id", session_id)
+                .field("token", &"<redacted>")
+                .finish(),
+            Self::StopSession { session_id } => f
+                .debug_struct("StopSession")
+                .field("session_id", session_id)
+                .finish(),
             Self::AcknowledgeRefreshTokenUpdate { connection_id, .. } => f
                 .debug_struct("AcknowledgeRefreshTokenUpdate")
                 .field("connection_id", connection_id)

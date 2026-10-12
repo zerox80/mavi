@@ -2,8 +2,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { state } from '../state.js';
 import {
   startCoreAnimation,
-  renderSparkline,
-  updateSparklineColors,
   startStatsAnimation,
   startSessionClock,
 } from '../animations.js';
@@ -183,52 +181,8 @@ describe('animations.js unit tests', () => {
     });
   });
 
-  describe('renderSparkline and updateSparklineColors', () => {
-    it('does nothing if sparkline element is missing', () => {
-      expect(() => renderSparkline()).not.toThrow();
-    });
-
-    it('renders sparkline SVG contents and sets colors when state.hero is on', () => {
-      const sparkline = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-      sparkline.id = 'sparkline';
-      document.body.appendChild(sparkline);
-
-      state.hero = 'on';
-      renderSparkline();
-
-      const line = document.getElementById('spark-line');
-      const fill = document.getElementById('spark-fill');
-
-      expect(line).not.toBeNull();
-      expect(fill).not.toBeNull();
-      expect(line.getAttribute('points')).not.toBeNull();
-      expect(line.getAttribute('stroke')).toBe('#2B44FF');
-      expect(fill.getAttribute('fill')).toBe('#2B44FF');
-      expect(fill.getAttribute('opacity')).toBe('0.08');
-    });
-
-    it('sets off colors when state.hero is off', () => {
-      const sparkline = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-      sparkline.id = 'sparkline';
-      document.body.appendChild(sparkline);
-
-      state.hero = 'off';
-      renderSparkline();
-
-      const line = document.getElementById('spark-line');
-      const fill = document.getElementById('spark-fill');
-
-      expect(line.getAttribute('stroke')).toBe('#cccccc'); // from mocked --line
-      expect(fill.getAttribute('opacity')).toBe('0');
-    });
-
-    it('updateSparklineColors returns early if elements are missing', () => {
-      expect(() => updateSparklineColors()).not.toThrow();
-    });
-  });
-
   describe('startStatsAnimation', () => {
-    it('updates stats elements on interval when state.hero is on', () => {
+    it('marks throughput unavailable without fabricating traffic while connected', () => {
       const down = document.createElement('div');
       down.id = 'stat-down';
       const up = document.createElement('div');
@@ -251,8 +205,11 @@ describe('animations.js unit tests', () => {
       // Advance one interval (800ms)
       vi.advanceTimersByTime(800);
 
-      expect(down.textContent).not.toBe('0.0');
-      expect(up.textContent).not.toBe('0.0');
+      expect(down.textContent).toBe('—');
+      expect(up.textContent).toBe('—');
+      vi.advanceTimersByTime(8000);
+      expect(down.textContent).toBe('—');
+      expect(up.textContent).toBe('—');
       expect(netIp.textContent).toBe('192.168.1.100');
     });
 

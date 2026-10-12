@@ -15,6 +15,7 @@ use tokio::sync::{Mutex, OwnedSemaphorePermit, Semaphore};
 
 use tracing::{error, info, warn};
 
+mod scoped;
 mod transport;
 pub use transport::send_request;
 use transport::{bind_ipc_socket, handle_ipc_client, resolve_ipc_token_access};
@@ -37,6 +38,7 @@ struct DaemonState {
     current_token: Arc<StdMutex<String>>,
     vpn_task: Option<tokio::task::JoinHandle<()>>,
     active_config: Option<Config>,
+    session_id: Option<String>,
 }
 
 impl DaemonState {
@@ -50,6 +52,7 @@ impl DaemonState {
             current_token: Arc::new(StdMutex::new(String::new())),
             vpn_task: None,
             active_config: None,
+            session_id: None,
         }
     }
 }
@@ -64,6 +67,12 @@ pub async fn run_daemon(running_flag: Arc<AtomicBool>) -> Result<()> {
     // on the same root-only-vs-group access model.
     let access = resolve_ipc_token_access()?;
     transport::write_ipc_token_with_access(&ipc::ipc_token_path(), &auth_token, access)?;
+
+    // Crash recovery must precede Start requests: endpoint resolution can need
+    // the original DNS servers before a new tunnel can be established.
+    if let Err(error) = crate::network::cleanup_stale_network_state() {
+        warn!(%error, "Startup network recovery needs attention");
+    }
 
     let listener = bind_ipc_socket(access)?;
     info!(
@@ -152,6 +161,11 @@ async fn dispatch_request_with_hooks(
     cleanup_stale_network_state: fn() -> Result<()>,
 ) -> IpcResponse {
     let mut guard = state.lock().await;
+    // Resolve and check scoped commands under the same lock as their effects.
+    let (req, session_id) = match scoped::resolve(req, &guard) {
+        Ok(request) => request,
+        Err(response) => return response,
+    };
     match req {
         IpcRequest::Status => {
             let running = guard.vpn_running.load(Ordering::SeqCst);
@@ -234,6 +248,7 @@ async fn dispatch_request_with_hooks(
                 IpcResponse::Error("VPN is already running".to_string())
             } else {
                 guard.active_config = Some(config.clone());
+                guard.session_id = session_id;
                 guard.vpn_running.store(true, Ordering::SeqCst);
                 guard.vpn_connected.store(false, Ordering::SeqCst);
                 guard.vpn_stopping.store(false, Ordering::SeqCst);
@@ -302,6 +317,12 @@ async fn dispatch_request_with_hooks(
             refresh_token: None,
         },
         IpcRequest::AcknowledgeRefreshTokenUpdate { .. } => IpcResponse::Ok,
+        IpcRequest::StartScoped { .. }
+        | IpcRequest::SessionStatus { .. }
+        | IpcRequest::UpdateSessionToken { .. }
+        | IpcRequest::StopSession { .. } => {
+            unreachable!("scoped requests are resolved before dispatch")
+        }
     }
 }
 
