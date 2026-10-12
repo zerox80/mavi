@@ -24,14 +24,14 @@ pub fn prefix_len_from_mask(mask: Ipv4Addr) -> u8 {
 pub struct IpGuard {
     pub state: Arc<AppState>,
     pub ip4: Ipv4Addr,
-    pub ip6: Ipv6Addr,
+    pub ip6: Option<Ipv6Addr>,
 }
 
 impl Drop for IpGuard {
     fn drop(&mut self) {
         self.state.release_ips(self.ip4, self.ip6);
         info!(
-            "Released IPs for dropped connection: {} / {}",
+            "Released IPs for dropped connection: {} / {:?}",
             self.ip4, self.ip6
         );
     }
@@ -143,7 +143,7 @@ mod tests {
             let _guard = IpGuard {
                 state: state.clone(),
                 ip4,
-                ip6,
+                ip6: Some(ip6),
             };
             assert!(state.peers.contains_key(&ip4));
         }

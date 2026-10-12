@@ -1,11 +1,12 @@
-use std::fs::{self, File, OpenOptions};
-use std::io::{self, Write};
+use std::fs::{self, File};
+use std::io::{self, Seek, SeekFrom, Write};
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 use tracing_subscriber::filter::EnvFilter;
 use tracing_subscriber::fmt::MakeWriter;
 
 const MAX_LOG_BYTES: u64 = 10 * 1024 * 1024;
+const LOG_DACL: &str = "D:P(A;OICI;FA;;;SY)(A;OICI;FA;;;BA)";
 
 #[derive(Clone)]
 struct SharedLogFile {
@@ -16,6 +17,8 @@ struct SharedLogFile {
 struct SharedLogState {
     path: PathBuf,
     file: Option<File>,
+    // Keep every ancestor pinned while writing and while rotating/reopening.
+    _directories: Vec<File>,
 }
 
 struct SharedLogWriter {
@@ -69,18 +72,14 @@ impl SharedLogState {
     }
 
     fn rotate_if_needed(&mut self) -> io::Result<()> {
-        if self
-            .file_mut()?
-            .metadata()
-            .is_ok_and(|metadata| metadata.len() < MAX_LOG_BYTES)
-        {
+        if self.file_mut()?.metadata()?.len() < MAX_LOG_BYTES {
             return Ok(());
         }
 
         if let Some(mut file) = self.file.take() {
             file.flush()?;
         }
-        rotate_if_needed(&self.path)?;
+        rotate_log_file(&self.path)?;
         self.file = Some(open_append_file(&self.path)?);
         Ok(())
     }
@@ -91,12 +90,9 @@ pub fn init_service_logging(console: bool) -> Option<PathBuf> {
     let log_path = service_log_dir().join("mavi-vpn-service.log");
 
     match open_log_file(&log_path) {
-        Ok(file) => {
+        Ok(state) => {
             let writer = SharedLogFile {
-                state: Arc::new(Mutex::new(SharedLogState {
-                    path: log_path.clone(),
-                    file: Some(file),
-                })),
+                state: Arc::new(Mutex::new(state)),
                 console,
             };
             if tracing_subscriber::fmt()
@@ -158,23 +154,44 @@ fn service_log_dir() -> PathBuf {
         .join("logs")
 }
 
-fn open_log_file(path: &Path) -> io::Result<File> {
-    if let Some(parent) = path.parent() {
-        fs::create_dir_all(parent)?;
-    }
-    rotate_if_needed(path)?;
-    open_append_file(path)
+fn open_log_file(path: &Path) -> io::Result<SharedLogState> {
+    let parent = path
+        .parent()
+        .ok_or_else(|| io::Error::other("Service log path has no parent"))?;
+    let directories =
+        crate::secure_path::lock_directory_tree(parent, true).map_err(io::Error::other)?;
+    crate::secure_path::replace_dacl(parent, LOG_DACL).map_err(io::Error::other)?;
+    let mut state = SharedLogState {
+        path: path.to_owned(),
+        file: Some(open_append_file(path)?),
+        _directories: directories,
+    };
+    state.rotate_if_needed()?;
+    Ok(state)
 }
 
 fn open_append_file(path: &Path) -> io::Result<File> {
-    OpenOptions::new().create(true).append(true).open(path)
+    // Validate the same handle that will be written: no following reparse
+    // points, no hard links, no untrusted owners, and no concurrent writers.
+    let mut file = crate::secure_path::lock_writable_file(path).map_err(io::Error::other)?;
+    crate::secure_path::ensure_trusted_owner(&file).map_err(io::Error::other)?;
+    crate::secure_path::replace_dacl(path, LOG_DACL).map_err(io::Error::other)?;
+    file.seek(SeekFrom::End(0))?;
+    Ok(file)
 }
 
-fn rotate_if_needed(path: &Path) -> io::Result<()> {
-    if fs::metadata(path).is_ok_and(|metadata| metadata.len() >= MAX_LOG_BYTES) {
-        let old_path = path.with_extension("log.old");
-        let _ = fs::remove_file(&old_path);
-        fs::rename(path, old_path)?;
+fn rotate_log_file(path: &Path) -> io::Result<()> {
+    // The validated, hardened parent is still pinned after the file handle
+    // closes, so an unprivileged process cannot redirect either operation.
+    let old_path = path.with_extension("log.old");
+    match fs::remove_file(&old_path) {
+        Ok(()) => {}
+        Err(error) if error.kind() == io::ErrorKind::NotFound => {}
+        Err(error) => return Err(error),
     }
-    Ok(())
+    fs::rename(path, old_path)
 }
+
+#[cfg(test)]
+#[path = "logging/tests.rs"]
+mod tests;

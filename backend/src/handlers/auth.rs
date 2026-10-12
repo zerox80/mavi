@@ -34,7 +34,7 @@ pub(crate) fn as_token_validator(
     keycloak.map(|kc| kc.as_ref() as &dyn TokenValidator)
 }
 
-/// On success returns the assigned IP pair and, for Keycloak auth, the validated
+/// On success returns IPv4 and optional IPv6 addresses and the validated Keycloak
 /// token (its expiry and subject). Static-token sessions carry no expiry and no
 /// subject (`None`).
 ///
@@ -50,7 +50,8 @@ pub async fn authenticate_client(
     state: &Arc<AppState>,
     config: &Config,
     keycloak: Option<&dyn TokenValidator>,
-) -> Result<(Ipv4Addr, Ipv6Addr, Option<ValidatedToken>)> {
+    ipv6_enabled: bool,
+) -> Result<(Ipv4Addr, Option<Ipv6Addr>, Option<ValidatedToken>)> {
     if state.auth_rate_limiter.is_blocked(remote_addr) {
         warn!(
             "Rejecting {} due to auth rate limit (repeated failed attempts)",
@@ -87,8 +88,11 @@ pub async fn authenticate_client(
         || "static-token".to_owned(),
         |auth| format!("keycloak:{}", auth.sub),
     );
-    let (ip4, ip6) =
-        state.assign_principal_ip_pair(principal, config.max_sessions_per_principal as usize)?;
+    let (ip4, ip6) = state.assign_principal_ip_pair(
+        principal,
+        config.max_sessions_per_principal as usize,
+        ipv6_enabled && !config.disable_ipv6,
+    )?;
     state.auth_rate_limiter.record_success(remote_addr);
     Ok((ip4, ip6, session_auth))
 }
@@ -115,7 +119,8 @@ mod tests {
     async fn valid_token_authenticates() {
         let state = Arc::new(AppState::new("10.8.0.0/24").unwrap());
         let config = test_config();
-        let result = authenticate_client("correct-token", test_ip(1), &state, &config, None).await;
+        let result =
+            authenticate_client("correct-token", test_ip(1), &state, &config, None, true).await;
         assert!(result.is_ok());
     }
 
@@ -123,7 +128,8 @@ mod tests {
     async fn invalid_token_rejects() {
         let state = Arc::new(AppState::new("10.8.0.0/24").unwrap());
         let config = test_config();
-        let result = authenticate_client("wrong-token", test_ip(2), &state, &config, None).await;
+        let result =
+            authenticate_client("wrong-token", test_ip(2), &state, &config, None, true).await;
         assert!(result.is_err());
         assert!(result.unwrap_err().to_string().contains("Invalid Token"));
     }
@@ -132,7 +138,7 @@ mod tests {
     async fn empty_token_rejects() {
         let state = Arc::new(AppState::new("10.8.0.0/24").unwrap());
         let config = test_config();
-        let result = authenticate_client("", test_ip(3), &state, &config, None).await;
+        let result = authenticate_client("", test_ip(3), &state, &config, None, true).await;
         assert!(result.is_err());
     }
 
@@ -141,11 +147,11 @@ mod tests {
         let state = Arc::new(AppState::new("10.8.0.0/24").unwrap());
         let config = test_config();
         let (ip4, ip6, session_auth) =
-            authenticate_client("correct-token", test_ip(4), &state, &config, None)
+            authenticate_client("correct-token", test_ip(4), &state, &config, None, true)
                 .await
                 .unwrap();
         assert_eq!(ip4, Ipv4Addr::new(10, 8, 0, 2));
-        assert_eq!(ip6, Ipv6Addr::new(0xfd00, 0, 0, 0, 0, 0, 0, 2));
+        assert_eq!(ip6, Some(Ipv6Addr::new(0xfd00, 0, 0, 0, 0, 0, 0, 2)));
         assert!(session_auth.is_none());
     }
 
@@ -153,10 +159,11 @@ mod tests {
     async fn pool_exhaustion_returns_error() {
         let state = Arc::new(AppState::new("10.0.0.0/30").unwrap());
         let config = test_config();
-        let _ = authenticate_client("correct-token", test_ip(5), &state, &config, None)
+        let _ = authenticate_client("correct-token", test_ip(5), &state, &config, None, true)
             .await
             .unwrap();
-        let result = authenticate_client("correct-token", test_ip(6), &state, &config, None).await;
+        let result =
+            authenticate_client("correct-token", test_ip(6), &state, &config, None, true).await;
         assert!(result.is_err());
     }
 
@@ -164,7 +171,8 @@ mod tests {
     async fn case_sensitive_token() {
         let state = Arc::new(AppState::new("10.8.0.0/24").unwrap());
         let config = test_config();
-        let result = authenticate_client("CORRECT-TOKEN", test_ip(7), &state, &config, None).await;
+        let result =
+            authenticate_client("CORRECT-TOKEN", test_ip(7), &state, &config, None, true).await;
         assert!(result.is_err());
     }
 
@@ -200,14 +208,20 @@ mod tests {
             calls: AtomicUsize::new(0),
         };
 
-        let (ip4, ip6, session_auth) =
-            authenticate_client("kc-token", test_ip(8), &state, &config, Some(&validator))
-                .await
-                .unwrap();
+        let (ip4, ip6, session_auth) = authenticate_client(
+            "kc-token",
+            test_ip(8),
+            &state,
+            &config,
+            Some(&validator),
+            true,
+        )
+        .await
+        .unwrap();
 
         assert_eq!(validator.calls.load(Ordering::SeqCst), 1);
         assert_eq!(ip4, Ipv4Addr::new(10, 8, 0, 2));
-        assert_eq!(ip6, Ipv6Addr::new(0xfd00, 0, 0, 0, 0, 0, 0, 2));
+        assert_eq!(ip6, Some(Ipv6Addr::new(0xfd00, 0, 0, 0, 0, 0, 0, 2)));
         assert_eq!(session_auth.map(|v| v.exp), Some(4_102_444_800));
     }
 
@@ -220,8 +234,15 @@ mod tests {
             calls: AtomicUsize::new(0),
         };
 
-        let result =
-            authenticate_client("kc-token", test_ip(9), &state, &config, Some(&validator)).await;
+        let result = authenticate_client(
+            "kc-token",
+            test_ip(9),
+            &state,
+            &config,
+            Some(&validator),
+            true,
+        )
+        .await;
 
         assert!(result.is_err());
         assert!(result
@@ -240,8 +261,15 @@ mod tests {
             calls: AtomicUsize::new(0),
         };
 
-        let result =
-            authenticate_client("kc-token", test_ip(10), &state, &config, Some(&validator)).await;
+        let result = authenticate_client(
+            "kc-token",
+            test_ip(10),
+            &state,
+            &config,
+            Some(&validator),
+            true,
+        )
+        .await;
 
         assert!(result.is_err());
         assert!(result
@@ -263,7 +291,7 @@ mod tests {
                 calls: AtomicUsize::new(0),
             };
             let result =
-                authenticate_client("kc-token", ip, &state, &config, Some(&validator)).await;
+                authenticate_client("kc-token", ip, &state, &config, Some(&validator), true).await;
             assert!(result.is_err());
             assert_eq!(validator.calls.load(Ordering::SeqCst), 1);
         }
@@ -273,7 +301,8 @@ mod tests {
             result: Err("invalid jwt header"),
             calls: AtomicUsize::new(0),
         };
-        let result = authenticate_client("kc-token", ip, &state, &config, Some(&validator)).await;
+        let result =
+            authenticate_client("kc-token", ip, &state, &config, Some(&validator), true).await;
 
         assert!(result.is_err());
         assert!(state.auth_rate_limiter.is_blocked(ip));
@@ -290,7 +319,7 @@ mod tests {
         // config so the IP becomes blocked, then switch to a Keycloak
         // validator and prove it is never even invoked.
         for _ in 0..10 {
-            let _ = authenticate_client("wrong-token", ip, &state, &config, None).await;
+            let _ = authenticate_client("wrong-token", ip, &state, &config, None, true).await;
         }
         assert!(state.auth_rate_limiter.is_blocked(ip));
 
@@ -298,7 +327,8 @@ mod tests {
             result: Ok(Some(4_102_444_800)),
             calls: AtomicUsize::new(0),
         };
-        let result = authenticate_client("kc-token", ip, &state, &config, Some(&validator)).await;
+        let result =
+            authenticate_client("kc-token", ip, &state, &config, Some(&validator), true).await;
 
         assert!(result.is_err());
         assert_eq!(
@@ -315,7 +345,7 @@ mod tests {
         let ip = test_ip(12);
 
         for _ in 0..9 {
-            let result = authenticate_client("wrong-token", ip, &state, &config, None).await;
+            let result = authenticate_client("wrong-token", ip, &state, &config, None, true).await;
             assert!(result.is_err());
         }
         assert!(
@@ -323,7 +353,7 @@ mod tests {
             "below the threshold should not block yet"
         );
 
-        let _ = authenticate_client("wrong-token", ip, &state, &config, None).await;
+        let _ = authenticate_client("wrong-token", ip, &state, &config, None, true).await;
         assert!(
             state.auth_rate_limiter.is_blocked(ip),
             "exactly the threshold should block"
@@ -337,17 +367,17 @@ mod tests {
         let ip = test_ip(13);
 
         for _ in 0..5 {
-            let _ = authenticate_client("wrong-token", ip, &state, &config, None).await;
-            let _ = authenticate_client("correct-token", ip, &state, &config, None).await;
+            let _ = authenticate_client("wrong-token", ip, &state, &config, None, true).await;
+            let _ = authenticate_client("correct-token", ip, &state, &config, None, true).await;
         }
         for _ in 0..9 {
-            let _ = authenticate_client("wrong-token", ip, &state, &config, None).await;
+            let _ = authenticate_client("wrong-token", ip, &state, &config, None, true).await;
         }
         assert!(
             !state.auth_rate_limiter.is_blocked(ip),
             "successes interleaved with failures must reset the failure count each time"
         );
-        let _ = authenticate_client("wrong-token", ip, &state, &config, None).await;
+        let _ = authenticate_client("wrong-token", ip, &state, &config, None, true).await;
         assert!(
             state.auth_rate_limiter.is_blocked(ip),
             "exactly the threshold after a success should block"
@@ -362,11 +392,11 @@ mod tests {
         let ip_b = test_ip(15);
 
         for _ in 0..10 {
-            let _ = authenticate_client("wrong-token", ip_a, &state, &config, None).await;
+            let _ = authenticate_client("wrong-token", ip_a, &state, &config, None, true).await;
         }
         assert!(state.auth_rate_limiter.is_blocked(ip_a));
 
-        let result = authenticate_client("correct-token", ip_b, &state, &config, None).await;
+        let result = authenticate_client("correct-token", ip_b, &state, &config, None, true).await;
         assert!(result.is_ok(), "a different IP must not be affected");
     }
 }
@@ -374,3 +404,7 @@ mod tests {
 #[cfg(test)]
 #[path = "auth_quota_tests.rs"]
 mod quota_tests;
+
+#[cfg(test)]
+#[path = "auth_ipv4_tests.rs"]
+mod ipv4_tests;

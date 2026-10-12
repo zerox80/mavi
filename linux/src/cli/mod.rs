@@ -2,7 +2,7 @@ mod config;
 mod secrets;
 
 use crate::{daemon, vpn_core};
-use anyhow::Result;
+use anyhow::{Context, Result};
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex as StdMutex};
@@ -28,26 +28,20 @@ pub fn run() {
 
     let args: Vec<String> = std::env::args().skip(1).collect();
 
-    let result = match args.first().map(|s| s.as_str()) {
+    let result = match command_name(&args) {
         // --- Direct CLI mode (no daemon needed) ---
-        Some("connect") | Some("up") | None => {
+        "connect" | "up" => {
             if !is_root() {
                 eprintln!("\x1b[1;31mError: This program requires root privileges.\x1b[0m");
                 eprintln!("Please run with: sudo mavi-vpn");
                 std::process::exit(1);
             }
 
-            let config_path = args
-                .iter()
-                .position(|a| a == "-c" || a == "--config")
-                .and_then(|i| args.get(i + 1))
-                .map(PathBuf::from);
-
-            run_connect(config_path)
+            config_path(&args).and_then(run_connect)
         }
 
         // --- Daemon mode (IPC server for GUI) ---
-        Some("daemon") => {
+        "daemon" => {
             if !is_root() {
                 eprintln!("\x1b[1;31mError: Daemon requires root privileges.\x1b[0m");
                 eprintln!("Please run with: sudo mavi-vpn daemon");
@@ -57,30 +51,22 @@ pub fn run() {
         }
 
         // --- IPC client commands (talk to running daemon) ---
-        Some("start") => {
-            let config_path = args
-                .iter()
-                .position(|a| a == "-c" || a == "--config")
-                .and_then(|i| args.get(i + 1))
-                .map(PathBuf::from);
-            run_ipc_start(config_path)
-        }
-        Some("stop") => run_ipc_stop(),
-        Some("repair") => run_repair(&args[1..]),
+        "start" => config_path(&args).and_then(run_ipc_start),
+        "stop" => run_ipc_stop(),
+        "repair" => run_repair(&args[1..]),
 
-        Some("status") => {
+        "status" => {
             run_status();
             Ok(())
         }
 
-        Some("help") | Some("--help") | Some("-h") => {
+        "help" | "--help" | "-h" => {
             print_help();
             Ok(())
         }
-        Some(cmd) => {
-            eprintln!("Unknown command: {}", cmd);
+        cmd => {
             print_help();
-            Ok(())
+            Err(anyhow::anyhow!("Unknown command: {cmd}"))
         }
     };
 
@@ -88,6 +74,25 @@ pub fn run() {
         eprintln!("\n\x1b[1;31mError: {:#}\x1b[0m", e);
         std::process::exit(1);
     }
+}
+
+fn command_name(args: &[String]) -> &str {
+    match args.first().map(String::as_str) {
+        None | Some("-c" | "--config") => "connect",
+        Some(command) => command,
+    }
+}
+
+fn config_path(args: &[String]) -> Result<Option<PathBuf>> {
+    args.iter()
+        .position(|arg| arg == "-c" || arg == "--config")
+        .map(|index| {
+            args.get(index + 1)
+                .filter(|path| !path.is_empty() && !path.starts_with('-'))
+                .map(PathBuf::from)
+                .context("-c / --config requires a file path")
+        })
+        .transpose()
 }
 
 // =============================================================================
@@ -98,6 +103,8 @@ fn run_connect(config_path: Option<PathBuf>) -> Result<()> {
     let rt = tokio::runtime::Runtime::new()?;
 
     rt.block_on(async {
+        crate::network::prepare_direct_connection()
+            .context("Could not recover networking before connecting")?;
         let config = config::load_or_prompt_config(config_path).await?;
 
         let running = Arc::new(AtomicBool::new(true));

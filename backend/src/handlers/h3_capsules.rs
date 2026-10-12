@@ -16,9 +16,11 @@ pub(crate) fn build_connect_ip_capsules(
     state: &AppState,
     config: &Config,
     assigned_ip: Ipv4Addr,
-    assigned_ip6: Ipv6Addr,
+    assigned_ip6: impl Into<Option<Ipv6Addr>>,
     ipv6_enabled: bool,
 ) -> Result<Vec<u8>> {
+    let assigned_ip6 = assigned_ip6.into().filter(|_| ipv6_enabled);
+    let ipv6_enabled = assigned_ip6.is_some();
     let success_msg = build_config_message(state, config, assigned_ip, assigned_ip6, ipv6_enabled);
     let mut capsule_stream = Vec::with_capacity(256);
 
@@ -27,7 +29,7 @@ pub(crate) fn build_connect_ip_capsules(
         ip: IpAddr::V4(assigned_ip),
         prefix_len: prefix_len_from_mask(state.network.mask()),
     }];
-    if ipv6_enabled {
+    if let Some(assigned_ip6) = assigned_ip6 {
         address_assigns.push(AssignedAddress {
             request_id: 0,
             ip: IpAddr::V6(assigned_ip6),

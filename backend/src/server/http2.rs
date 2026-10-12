@@ -264,6 +264,7 @@ async fn handle_request(
         &state,
         &config,
         as_token_validator(keycloak.as_ref()),
+        ipv6_enabled,
     )
     .await
     {

@@ -25,6 +25,7 @@ async fn subject_quota_survives_token_rotation_and_source_changes() {
             &state,
             &config,
             Some(&Subject("alice")),
+            true,
         )
         .await;
         if n <= 2 {
@@ -39,6 +40,7 @@ async fn subject_quota_survives_token_rotation_and_source_changes() {
         &state,
         &config,
         Some(&Subject("bob")),
+        true,
     )
     .await
     .unwrap();
@@ -50,6 +52,7 @@ async fn subject_quota_survives_token_rotation_and_source_changes() {
         &state,
         &config,
         Some(&Subject("alice")),
+        true,
     )
     .await
     .unwrap();
@@ -58,7 +61,8 @@ async fn subject_quota_survives_token_rotation_and_source_changes() {
         "192.0.2.5".parse().unwrap(),
         &state,
         &config,
-        Some(&Subject("alice"))
+        Some(&Subject("alice")),
+        true
     )
     .await
     .is_err());
@@ -83,6 +87,7 @@ async fn shared_static_credential_has_one_quota_across_addresses() {
         &state,
         &config,
         None,
+        true,
     )
     .await
     .unwrap();
@@ -91,7 +96,8 @@ async fn shared_static_credential_has_one_quota_across_addresses() {
         "192.0.2.2".parse().unwrap(),
         &state,
         &config,
-        None
+        None,
+        true
     )
     .await
     .is_err());
@@ -101,7 +107,8 @@ async fn shared_static_credential_has_one_quota_across_addresses() {
         "192.0.2.2".parse().unwrap(),
         &state,
         &config,
-        None
+        None,
+        true
     )
     .await
     .is_ok());
@@ -110,10 +117,16 @@ async fn shared_static_credential_has_one_quota_across_addresses() {
 #[test]
 fn allocation_failure_does_not_leak_principal_reservation() {
     let state = AppState::new("10.8.0.0/30").unwrap();
-    let (a, b) = state.assign_principal_ip_pair("alice".into(), 1).unwrap();
-    assert!(state.assign_principal_ip_pair("bob".into(), 1).is_err());
+    let (a, b) = state
+        .assign_principal_ip_pair("alice".into(), 1, true)
+        .unwrap();
+    assert!(state
+        .assign_principal_ip_pair("bob".into(), 1, true)
+        .is_err());
     state.release_ips(a, b);
-    assert!(state.assign_principal_ip_pair("bob".into(), 1).is_ok());
+    assert!(state
+        .assign_principal_ip_pair("bob".into(), 1, true)
+        .is_ok());
 }
 
 #[tokio::test]
@@ -134,6 +147,7 @@ async fn concurrent_authentication_cannot_race_quota() {
                 &state,
                 &config,
                 Some(&Subject("alice")),
+                true,
             )
             .await
         });

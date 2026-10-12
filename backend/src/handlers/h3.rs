@@ -159,6 +159,7 @@ pub async fn handle_h3_connection(
         &state,
         &config,
         as_token_validator(keycloak.as_ref()),
+        ipv6_enabled,
     )
     .await;
 
@@ -210,7 +211,7 @@ pub async fn handle_h3_connection(
         .map_err(|e| anyhow::anyhow!("H3 send_data error: {e}"))?;
 
     info!(
-        "H3 Authenticated {} | SNI: {} -> IPv4: {}, IPv6: {}",
+        "H3 Authenticated {} | SNI: {} -> IPv4: {}, IPv6: {:?}",
         remote_addr,
         sni.as_deref().unwrap_or("<none>"),
         assigned_ip,

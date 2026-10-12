@@ -53,14 +53,21 @@ fn client_to_server_packet(datagram: Bytes, is_h3: bool) -> Option<Bytes> {
     Some(datagram.slice(prefix_len..))
 }
 
-fn packet_source_is_assigned(packet: &[u8], assigned_ip: Ipv4Addr, assigned_ip6: Ipv6Addr) -> bool {
+fn packet_source_is_assigned(
+    packet: &[u8],
+    assigned_ip: Ipv4Addr,
+    assigned_ip6: impl Into<Option<Ipv6Addr>>,
+) -> bool {
     if packet.is_empty() {
         return false;
     }
 
+    let assigned_ip6 = assigned_ip6.into();
     match packet[0] >> 4 {
         4 => Ipv4HeaderSlice::from_slice(packet).is_ok_and(|h| h.source_addr() == assigned_ip),
-        6 => Ipv6HeaderSlice::from_slice(packet).is_ok_and(|h| h.source_addr() == assigned_ip6),
+        6 => {
+            Ipv6HeaderSlice::from_slice(packet).is_ok_and(|h| Some(h.source_addr()) == assigned_ip6)
+        }
         _ => false,
     }
 }
@@ -101,7 +108,7 @@ pub async fn run_tunnel(
     mut rx_client: mpsc::Receiver<Bytes>,
     tx_tun: mpsc::Sender<Bytes>,
     assigned_ip: Ipv4Addr,
-    assigned_ip6: Ipv6Addr,
+    assigned_ip6: Option<Ipv6Addr>,
     gv4: Ipv4Addr,
     gv6: Ipv6Addr,
     tunnel_mtu: u16,
@@ -327,6 +334,16 @@ mod tests {
             &ipv6_packet(assigned_v6, Ipv6Addr::LOCALHOST),
             assigned_v4,
             assigned_v6
+        ));
+        assert!(!packet_source_is_assigned(
+            &ipv6_packet(assigned_v6, Ipv6Addr::LOCALHOST),
+            assigned_v4,
+            None
+        ));
+        assert!(packet_source_is_assigned(
+            &ipv4_packet(assigned_v4, Ipv4Addr::new(1, 1, 1, 1)),
+            assigned_v4,
+            None
         ));
     }
 
