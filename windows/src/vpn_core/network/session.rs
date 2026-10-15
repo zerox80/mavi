@@ -155,7 +155,7 @@ pub fn set_adapter_network_config(
         );
     }
 
-    configure_dns(&adapter_name, dns);
+    configure_dns(&adapter_name, dns)?;
 
     win32_set_mtu(adapter_index, u32::from(tun_mtu), AF_INET);
     win32_set_mtu(adapter_index, u32::from(tun_mtu), AF_INET6 as _);
@@ -169,7 +169,7 @@ pub fn set_adapter_network_config(
         route_started.elapsed().as_millis()
     );
 
-    configure_vpn_dns_preference(&adapter_name, adapter_index, dns, dns_v6);
+    configure_vpn_dns_preference(&adapter_name, adapter_index, dns, dns_v6)?;
 
     info!(
         "Network config complete: host route exceptions={}",

@@ -316,6 +316,7 @@ async fn dispatch_request_with_hooks(
             connection_id: None,
             refresh_token: None,
         },
+        IpcRequest::AcknowledgeRefreshTokenUpdate { .. } => IpcResponse::Ok,
         IpcRequest::StartScoped { .. }
         | IpcRequest::SessionStatus { .. }
         | IpcRequest::UpdateSessionToken { .. }

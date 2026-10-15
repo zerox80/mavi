@@ -166,6 +166,10 @@ fn test_ipc_request_roundtrip() {
         IpcRequest::StopSession {
             session_id: "session-1".into(),
         },
+        IpcRequest::AcknowledgeRefreshTokenUpdate {
+            connection_id: "conn-1".to_string(),
+            refresh_token: "rotated-refresh-secret".to_string(),
+        },
     ];
 
     for req in configs {
@@ -174,6 +178,33 @@ fn test_ipc_request_roundtrip() {
             bincode::serde::decode_from_slice(&encoded, bincode::config::standard()).unwrap();
         assert_eq!(req, decoded);
     }
+}
+
+#[test]
+fn refresh_token_acknowledgement_preserves_existing_wire_tags_and_redacts_secrets() {
+    let old = bincode::serde::encode_to_vec(
+        IpcRequest::TakeRefreshTokenUpdate,
+        bincode::config::standard(),
+    )
+    .unwrap();
+    assert_eq!(old, vec![6]);
+    // The scoped-session requests already shipped as tags 7..=10, so the
+    // acknowledgement is appended after them.
+    let stop = bincode::serde::encode_to_vec(
+        IpcRequest::StopSession {
+            session_id: String::new(),
+        },
+        bincode::config::standard(),
+    )
+    .unwrap();
+    assert_eq!(stop[0], 10);
+    let ack = IpcRequest::AcknowledgeRefreshTokenUpdate {
+        connection_id: "conn-1".into(),
+        refresh_token: "rotated-refresh-secret".into(),
+    };
+    let encoded = bincode::serde::encode_to_vec(&ack, bincode::config::standard()).unwrap();
+    assert_eq!(encoded[0], 11);
+    assert!(!format!("{ack:?}").contains("rotated-refresh-secret"));
 }
 
 #[test]
