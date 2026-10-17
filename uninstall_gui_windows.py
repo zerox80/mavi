@@ -77,71 +77,6 @@ def ask(question, default="y"):
     return (answer in ("y", "yes", "j", "ja")) if answer else (default == "y")
 
 
-def repair_network_state():
-    """Remove stale MaviVPN routes and DNS policy left by interrupted sessions."""
-    ps = r"""
-$persisted = Join-Path $env:ProgramData 'mavi-vpn\last_host_route.txt'
-if (Test-Path $persisted) {
-    foreach ($line in Get-Content -LiteralPath $persisted -ErrorAction SilentlyContinue) {
-        # Legacy prefix-only records cannot establish ownership safely.
-        try { $record = $line | ConvertFrom-Json -ErrorAction Stop } catch { continue }
-        [System.Net.IPAddress]$destination = $null
-        [System.Net.IPAddress]$nextHop = $null
-        [uint32]$interfaceIndex = 0
-        if (-not [System.Net.IPAddress]::TryParse([string]$record.destination, [ref]$destination) -or
-            -not [System.Net.IPAddress]::TryParse([string]$record.next_hop, [ref]$nextHop) -or
-            -not [uint32]::TryParse([string]$record.interface_index, [ref]$interfaceIndex) -or
-            $interfaceIndex -eq 0 -or $destination.AddressFamily -ne $nextHop.AddressFamily) { continue }
-        $length = if ($destination.AddressFamily -eq [System.Net.Sockets.AddressFamily]::InterNetwork) { 32 } else { 128 }
-        $prefix = "$($destination.ToString())/$length"
-        Remove-NetRoute -DestinationPrefix $prefix -InterfaceIndex $interfaceIndex -NextHop ($nextHop.ToString()) -PolicyStore ActiveStore -Confirm:$false -ErrorAction SilentlyContinue | Out-Null
-    }
-    Remove-Item $persisted -Force -ErrorAction SilentlyContinue
-}
-foreach ($prefix in @('0.0.0.0/1','128.0.0.0/1','::/1','8000::/1')) {
-    Get-NetRoute -DestinationPrefix $prefix -ErrorAction SilentlyContinue |
-        Where-Object { (Get-NetAdapter -InterfaceIndex $_.InterfaceIndex -IncludeHidden -ErrorAction SilentlyContinue).Name -like 'MaviVPN*' } |
-        Remove-NetRoute -Confirm:$false -ErrorAction SilentlyContinue | Out-Null
-}
-$persistedDnsPath = Join-Path $env:ProgramData 'mavi-vpn\last_dns_servers.txt'
-function Test-MaviDnsPolicy {
-    param($Policy)
-    return ($Policy.Comment -eq 'MaviVPN' -or $Policy.DisplayName -eq 'MaviVPN DNS Force')
-}
-Get-DnsClientNrptRule -ErrorAction SilentlyContinue |
-    Where-Object { Test-MaviDnsPolicy $_ } |
-    Remove-DnsClientNrptRule -Force -ErrorAction SilentlyContinue
-$policyRoots = @(
-    'HKLM:\SOFTWARE\Policies\Microsoft\Windows NT\DNSClient\DnsPolicyConfig',
-    'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\DNSClient\DnsPolicyConfig',
-    'HKLM:\SYSTEM\CurrentControlSet\Services\Dnscache\Parameters\DnsPolicyConfig'
-)
-foreach ($root in $policyRoots) {
-    if (-not (Test-Path $root)) { continue }
-    Get-ChildItem $root -ErrorAction SilentlyContinue | ForEach-Object {
-        $props = Get-ItemProperty $_.PSPath -ErrorAction SilentlyContinue
-        if ($props -and (Test-MaviDnsPolicy $props)) {
-            Remove-Item $_.PSPath -Recurse -Force -ErrorAction SilentlyContinue
-        }
-    }
-}
-Remove-Item -LiteralPath $persistedDnsPath -Force -ErrorAction SilentlyContinue
-Clear-DnsClientCache -ErrorAction SilentlyContinue
-Register-DnsClient -ErrorAction SilentlyContinue
-Start-Service -Name Dnscache -ErrorAction SilentlyContinue
-"""
-    info("Cleaning stale MaviVPN routes and DNS policy...")
-    r = subprocess.run(
-        ["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", ps],
-        capture_output=True,
-        text=True,
-    )
-    if r.returncode == 0:
-        ok("Network repair cleanup completed")
-    else:
-        warn("Network repair cleanup may be incomplete; try running as Administrator.")
-
-
 # ---------------------------------------------------------------------------
 # NSIS uninstaller detection
 # ---------------------------------------------------------------------------
@@ -230,8 +165,8 @@ def main():
 
     removed_anything = False
 
-    step("Network repair")
-    repair_network_state()
+    # The service owns routes and DNS, including cleanup on tunnel shutdown.
+    # GUI-only removal or cancellation must leave an active tunnel intact.
 
     # -- NSIS uninstaller -------------------------------------------------------
     step("NSIS uninstaller")
