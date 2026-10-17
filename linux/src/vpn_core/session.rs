@@ -54,6 +54,7 @@ pub async fn run_vpn(
     assigned_ip: Arc<StdMutex<Option<String>>>,
     current_token: Arc<StdMutex<String>>,
     refresh_token: Arc<StdMutex<Option<String>>>,
+    persist_tokens: Option<super::TokenPersistence>,
 ) -> Result<()> {
     config.normalize_transport();
 
@@ -62,8 +63,12 @@ pub async fn run_vpn(
     )?;
 
     let mut backoff = Duration::from_secs(RECONNECT_INITIAL_SECS);
-    let refresher =
-        super::kc_refresh::TokenRefresher::new(&config, current_token.clone(), refresh_token);
+    let refresher = super::kc_refresh::TokenRefresher::new(
+        &config,
+        current_token.clone(),
+        refresh_token,
+        persist_tokens,
+    );
     let refresh_task = refresher
         .as_ref()
         .map(|r| r.spawn(running.clone(), last_error.clone()));

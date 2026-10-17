@@ -6,10 +6,14 @@ use std::sync::{Arc, Mutex as StdMutex};
 use std::time::Duration;
 use tracing::{info, warn};
 
+/// Persists refreshed credentials for callers that own a credential store.
+pub type TokenPersistence = Box<dyn Fn(&kc_oauth::OAuthTokens) -> anyhow::Result<()> + Send + Sync>;
+
 pub(super) struct TokenRefresher {
     current_token: Arc<StdMutex<String>>,
     refresh_token: Arc<StdMutex<Option<String>>>,
     refresh_lock: tokio::sync::Mutex<()>,
+    persist_tokens: Option<TokenPersistence>,
     kc_url: String,
     realm: String,
     client_id: String,
@@ -37,12 +41,14 @@ impl TokenRefresher {
         config: &shared::ipc::Config,
         current_token: Arc<StdMutex<String>>,
         refresh_token: Arc<StdMutex<Option<String>>>,
+        persist_tokens: Option<TokenPersistence>,
     ) -> Option<Arc<Self>> {
         config.kc_auth.unwrap_or(false).then(|| {
             Arc::new(Self {
                 current_token,
                 refresh_token,
                 refresh_lock: tokio::sync::Mutex::new(()),
+                persist_tokens,
                 kc_url: config.kc_url.clone().unwrap_or_default(),
                 realm: config.kc_realm.clone().unwrap_or_else(|| "mavi-vpn".into()),
                 client_id: config
@@ -95,6 +101,16 @@ impl TokenRefresher {
         };
         match exchange(refresh).await {
             RefreshOutcome::Success(tokens) => {
+                // Persist while holding refresh_lock so concurrent refreshes
+                // cannot overwrite newer credentials with an older rotation.
+                if let Some(persist) = &self.persist_tokens {
+                    if let Err(error) = persist(&tokens) {
+                        warn!(
+                            "Could not save refreshed Keycloak credentials to the OS keyring: \
+                             {error:#}. You may need to log in again next time."
+                        );
+                    }
+                }
                 *self
                     .current_token
                     .lock()

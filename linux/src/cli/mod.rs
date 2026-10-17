@@ -105,7 +105,7 @@ fn run_connect(config_path: Option<PathBuf>) -> Result<()> {
     rt.block_on(async {
         crate::network::prepare_direct_connection()
             .context("Could not recover networking before connecting")?;
-        let config = config::load_or_prompt_config(config_path).await?;
+        let (config, config_path) = config::load_or_prompt_config(config_path).await?;
 
         let running = Arc::new(AtomicBool::new(true));
         let connected = Arc::new(AtomicBool::new(false));
@@ -145,6 +145,10 @@ fn run_connect(config_path: Option<PathBuf>) -> Result<()> {
             assigned_ip,
             current_token,
             refresh_token,
+            Some(secrets::token_persistence(
+                &config_path,
+                secrets::KeyringSecretStore,
+            )),
         )
         .await?;
 
@@ -192,7 +196,7 @@ fn run_daemon() -> Result<()> {
 fn run_ipc_start(config_path: Option<PathBuf>) -> Result<()> {
     let rt = tokio::runtime::Runtime::new()?;
     rt.block_on(async {
-        let config = config::load_or_prompt_config(config_path).await?;
+        let (config, _) = config::load_or_prompt_config(config_path).await?;
         handle_action_response(
             daemon::send_request(shared::ipc::IpcRequest::Start(config)).await,
             "Start accepted. Run status to check tunnel readiness.",
