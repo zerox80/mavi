@@ -135,7 +135,7 @@ fn write_config_file(path: &Path, content: &[u8]) -> Result<()> {
     Ok(())
 }
 
-pub async fn load_or_prompt_config(explicit_path: Option<PathBuf>) -> Result<Config> {
+pub async fn load_or_prompt_config(explicit_path: Option<PathBuf>) -> Result<(Config, PathBuf)> {
     let config_path = explicit_path.unwrap_or_else(default_config_path);
     let store = KeyringSecretStore;
 
@@ -193,14 +193,14 @@ pub async fn load_or_prompt_config(explicit_path: Option<PathBuf>) -> Result<Con
                 save_config(&saved, &config_path, &store)?;
             }
 
-            return Ok(saved);
+            return Ok((saved, config_path));
         }
         println!();
     }
 
     let config = prompt_new_config().await?;
     save_config(&config, &config_path, &store)?;
-    Ok(config)
+    Ok((config, config_path))
 }
 
 /// Tries to renew the Keycloak access token silently using the stored refresh

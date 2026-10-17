@@ -64,6 +64,23 @@ impl SecretAccounts {
     }
 }
 
+/// Runtime refreshes update only the keyring, using the same config path as
+/// startup. Store the rotated refresh token first: it is needed on the next run
+/// even if saving the access token fails. An omitted refresh token keeps the
+/// existing entry, matching Keycloak's non-rotating refresh responses.
+pub(super) fn token_persistence(
+    path: &Path,
+    store: impl SecretStore + Send + Sync + 'static,
+) -> crate::vpn_core::TokenPersistence {
+    let accounts = SecretAccounts::for_config(path);
+    Box::new(move |tokens| {
+        if let Some(refresh) = tokens.refresh_token.as_deref().filter(|r| !r.is_empty()) {
+            store.set_secret(&accounts.refresh_token, refresh)?;
+        }
+        store.set_secret(&accounts.token, &tokens.access_token)
+    })
+}
+
 /// Returns true when a config read from disk still carries plaintext secrets.
 pub(super) fn has_plaintext_secrets(config: &Config) -> bool {
     !config.token.is_empty()

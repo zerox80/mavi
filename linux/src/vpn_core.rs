@@ -10,4 +10,5 @@ mod kc_refresh;
 mod session;
 mod socket;
 
+pub use kc_refresh::TokenPersistence;
 pub use session::run_vpn;

@@ -1,32 +1,33 @@
 use super::*;
-use std::cell::RefCell;
 use std::collections::HashMap;
+use std::sync::{Arc, Mutex};
 
-#[derive(Default)]
+#[derive(Clone, Default)]
 pub(in crate::cli) struct MemorySecretStore {
-    secrets: RefCell<HashMap<String, String>>,
+    secrets: Arc<Mutex<HashMap<String, String>>>,
 }
 
 impl MemorySecretStore {
     pub(in crate::cli) fn len(&self) -> usize {
-        self.secrets.borrow().len()
+        self.secrets.lock().unwrap().len()
     }
 }
 
 impl SecretStore for MemorySecretStore {
     fn set_secret(&self, account: &str, secret: &str) -> Result<()> {
         self.secrets
-            .borrow_mut()
+            .lock()
+            .unwrap()
             .insert(account.to_string(), secret.to_string());
         Ok(())
     }
 
     fn get_secret(&self, account: &str) -> Result<Option<String>> {
-        Ok(self.secrets.borrow().get(account).cloned())
+        Ok(self.secrets.lock().unwrap().get(account).cloned())
     }
 
     fn delete_secret(&self, account: &str) -> Result<()> {
-        self.secrets.borrow_mut().remove(account);
+        self.secrets.lock().unwrap().remove(account);
         Ok(())
     }
 }
@@ -131,4 +132,43 @@ fn clearing_secrets_deletes_stale_keyring_entries() {
     strip_secrets(&cleared, &accounts, &store);
 
     assert_eq!(store.len(), 0);
+}
+
+#[test]
+fn runtime_rotation_survives_a_failure_to_save_the_access_token() {
+    struct FailingAccessStore(MemorySecretStore);
+
+    impl SecretStore for FailingAccessStore {
+        fn set_secret(&self, account: &str, secret: &str) -> Result<()> {
+            if account.ends_with(":token") {
+                anyhow::bail!("access token storage failed");
+            }
+            self.0.set_secret(account, secret)
+        }
+
+        fn get_secret(&self, account: &str) -> Result<Option<String>> {
+            self.0.get_secret(account)
+        }
+
+        fn delete_secret(&self, account: &str) -> Result<()> {
+            self.0.delete_secret(account)
+        }
+    }
+
+    let path = Path::new("/etc/mavi-vpn/mavi-vpn.json");
+    let store = MemorySecretStore::default();
+    let accounts = SecretAccounts::for_config(path);
+    let mut on_disk = strip_secrets(&sample_config(true), &accounts, &store);
+    let persist = token_persistence(path, FailingAccessStore(store.clone()));
+
+    assert!(persist(&shared::kc_oauth::OAuthTokens {
+        access_token: "new-access-token".into(),
+        refresh_token: Some("rotated-refresh-token".into()),
+    })
+    .is_err());
+    restore_secrets(&mut on_disk, &accounts, &store);
+    assert_eq!(
+        on_disk.refresh_token.as_deref(),
+        Some("rotated-refresh-token")
+    );
 }

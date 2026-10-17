@@ -278,6 +278,7 @@ async fn dispatch_request_with_hooks(
                             assigned_ip.clone(),
                             current_token,
                             refresh_token,
+                            None,
                         )
                         .await
                         {
