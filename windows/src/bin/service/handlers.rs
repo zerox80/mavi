@@ -19,6 +19,7 @@ fn requires_caller_identity(request: &ipc::IpcRequest) -> bool {
         request,
         ipc::IpcRequest::StartWithKeycloak { .. }
             | ipc::IpcRequest::TakeRefreshTokenUpdate
+            | ipc::IpcRequest::TakeRefreshTokenUpdateFor { .. }
             | ipc::IpcRequest::AcknowledgeRefreshTokenUpdate { .. }
     )
 }
@@ -180,10 +181,18 @@ async fn dispatch_as(
             guard.set_current_token(token);
             ipc::IpcResponse::Ok
         }
-        ipc::IpcRequest::TakeRefreshTokenUpdate => {
+        request @ (ipc::IpcRequest::TakeRefreshTokenUpdate
+        | ipc::IpcRequest::TakeRefreshTokenUpdateFor { .. }) => {
             // Pending rotations outlive the active tunnel. Authorize against
             // each queued token's original logon, not the current VPN owner.
-            match guard.pending_keycloak_refresh_token(&caller.owner.refresh_token_key()) {
+            let owner_key = caller.owner.refresh_token_key();
+            let pending = match request {
+                ipc::IpcRequest::TakeRefreshTokenUpdateFor { connection_id } => {
+                    guard.pending_keycloak_refresh_token_for(&owner_key, &connection_id)
+                }
+                _ => guard.pending_keycloak_refresh_token(&owner_key),
+            };
+            match pending {
                 Some(update) => ipc::IpcResponse::RefreshTokenUpdate {
                     connection_id: Some(update.connection_id),
                     refresh_token: Some(update.refresh_token),

@@ -15,7 +15,7 @@ pub(crate) fn start_request(config: ipc::Config) -> IpcRequest {
             .filter(|token| !token.is_empty())
         {
             let keycloak = ipc::KeycloakRuntimeAuth {
-                connection_id: "windows-cli".into(),
+                connection_id: ipc::WINDOWS_CLI_CONNECTION_ID.into(),
                 kc_url: config.kc_url.clone().unwrap_or_default(),
                 realm: config.kc_realm.clone().unwrap_or_else(|| "mavi-vpn".into()),
                 client_id: config
@@ -105,12 +105,23 @@ pub(crate) async fn send_request_internal(req: IpcRequest) -> Result<IpcResponse
 }
 
 pub(crate) async fn send_request(req: IpcRequest) -> Result<()> {
+    let _credentials =
+        crate::client_credentials::lock_credentials(&crate::client_config::config_path()).await?;
+    send_request_with_credentials(req).await
+}
+
+/// Caller holds the CLI credential lock through login, storage and Start.
+pub(crate) async fn send_request_with_credentials(req: IpcRequest) -> Result<()> {
     let is_start = matches!(
         req,
         IpcRequest::Start(_) | IpcRequest::StartWithKeycloak { .. }
     );
     let response = send_request_internal(req.clone()).await;
-    match validate_response(&req, response)? {
+    let response = validate_response(&req, response)?;
+    // After Stop/repair, pending rotations remain available until we confirm
+    // that the CLI keyring was updated successfully.
+    sync_service_refresh_tokens().await?;
+    match response {
         IpcResponse::Ok => {
             if is_start {
                 wait_for_connected().await?;
@@ -140,6 +151,15 @@ pub(crate) async fn send_request(req: IpcRequest) -> Result<()> {
         _ => anyhow::bail!("Unexpected response from service"),
     }
     Ok(())
+}
+
+pub(crate) async fn sync_service_refresh_tokens() -> Result<()> {
+    crate::client_credentials::sync_refresh_tokens(
+        &crate::secrets::KeyringSecretStore,
+        send_request_internal,
+    )
+    .await
+    .context("Could not save rotated CLI credentials; retry before starting again")
 }
 
 fn validate_response(req: &IpcRequest, response: Result<IpcResponse>) -> Result<IpcResponse> {

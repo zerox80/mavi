@@ -156,6 +156,9 @@ fn test_ipc_request_roundtrip() {
             },
         },
         IpcRequest::TakeRefreshTokenUpdate,
+        IpcRequest::TakeRefreshTokenUpdateFor {
+            connection_id: WINDOWS_CLI_CONNECTION_ID.into(),
+        },
         IpcRequest::SessionStatus {
             session_id: "session-1".into(),
         },
@@ -348,6 +351,19 @@ fn scoped_start_roundtrips_and_new_variants_do_not_shift_old_discriminants() {
             4,
         ),
         (IpcRequest::TakeRefreshTokenUpdate, 6),
+        (
+            IpcRequest::AcknowledgeRefreshTokenUpdate {
+                connection_id: "profile".into(),
+                refresh_token: "secret".into(),
+            },
+            11,
+        ),
+        (
+            IpcRequest::TakeRefreshTokenUpdateFor {
+                connection_id: WINDOWS_CLI_CONNECTION_ID.into(),
+            },
+            12,
+        ),
     ] {
         assert_eq!(
             bincode::serde::encode_to_vec(&request, bincode::config::standard()).unwrap()[0],

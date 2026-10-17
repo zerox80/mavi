@@ -2,7 +2,10 @@ use anyhow::Result;
 use std::io::{self, Write};
 
 use crate::client_config::{load_config, save_config};
-use crate::client_ipc::{send_request, send_request_internal, start_request};
+use crate::client_ipc::{
+    send_request, send_request_internal, send_request_with_credentials, start_request,
+    sync_service_refresh_tokens,
+};
 use crate::ipc::{Config, IpcRequest, IpcResponse};
 use crate::oauth;
 use shared::kc_oauth::RefreshOutcome;
@@ -30,8 +33,7 @@ pub(crate) async fn interactive_mode() -> Result<()> {
         }
         Ok(IpcResponse::Status { running: false, .. }) => {
             println!("VPN is disconnected.");
-            let config = load_or_prompt_config().await?;
-            send_request(start_request(config)).await?;
+            start_vpn().await?;
             println!("\nVPN is now CONNECTED!");
             println!("To safely DISCONNECT and exit, press Enter...");
             let _ = read_line();
@@ -53,7 +55,17 @@ pub(crate) async fn interactive_mode() -> Result<()> {
     Ok(())
 }
 
-pub(crate) async fn load_or_prompt_config() -> Result<Config> {
+pub(crate) async fn start_vpn() -> Result<()> {
+    let _credentials =
+        crate::client_credentials::lock_credentials(&crate::client_config::config_path()).await?;
+    let config = load_or_prompt_config().await?;
+    send_request_with_credentials(start_request(config)).await
+}
+
+async fn load_or_prompt_config() -> Result<Config> {
+    // Drain the previous session before loading secrets or attempting OAuth:
+    // its service-side rotation may have consumed the saved refresh token.
+    sync_service_refresh_tokens().await?;
     if let Some(mut saved) = load_config()? {
         println!("Saved configuration found:");
         println!("  Endpoint: {}", saved.endpoint);
