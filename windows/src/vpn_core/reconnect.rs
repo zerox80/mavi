@@ -9,7 +9,7 @@ pub(crate) const RECONNECT_MAX_SECS: u64 = 30;
 
 /// Marker substrings for Windows-specific permanent failures: adapter/IP setup
 /// that will fail identically on retry, so the loop stops instead of backing
-/// off forever. The cross-platform markers (auth, server rejection, MTU) live
+/// off forever. The cross-platform markers (explicit auth failures, MTU) live
 /// in [`shared::session_errors`] — previously this list duplicated them and
 /// had drifted (it was missing `unsupported VPN MTU`, so an out-of-range
 /// server MTU retried forever on Windows).
@@ -171,12 +171,18 @@ mod tests {
     }
 
     #[test]
-    fn permanent_server_rejected_stops() {
-        let err = anyhow::anyhow!("Server rejected connection: bad token");
-        assert!(matches!(
-            compute_reconnect_delay(Err(err), Duration::from_secs(5)),
-            ReconnectDecision::PermanentFailure { .. }
-        ));
+    fn generic_server_rejection_retries_with_backoff() {
+        let err = anyhow::anyhow!("Server rejected connection: Unauthorized");
+        match compute_reconnect_delay(Err(err), Duration::from_secs(5)) {
+            ReconnectDecision::Reconnect {
+                delay,
+                next_backoff,
+            } => {
+                assert_eq!(delay, Duration::from_secs(5));
+                assert_eq!(next_backoff, Duration::from_secs(10));
+            }
+            other => panic!("Expected Reconnect, got {other:?}"),
+        }
     }
 
     #[test]

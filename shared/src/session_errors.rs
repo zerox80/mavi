@@ -2,9 +2,11 @@
 //!
 //! Every client crate runs a reconnect loop that must decide whether a failed
 //! session is worth retrying. Some failures are permanent: reconnecting cannot
-//! fix bad credentials, a rejected handshake, or an MTU misconfiguration — the
-//! retry would fail identically, so the loop must stop instead of backing off
-//! forever.
+//! fix an explicitly detected authentication failure or an MTU misconfiguration
+//! — the retry would fail identically, so the loop must stop instead of backing
+//! off forever. A generic server rejection is ambiguous: the server deliberately
+//! hides whether authentication failed or principal/IP capacity is temporarily
+//! exhausted. These rejections must remain retryable with backoff.
 //!
 //! Historically each platform crate (Linux, Windows, Android) kept its own
 //! marker list, which silently drifted: Windows, for example, did not
@@ -18,6 +20,7 @@
 pub const MARKER_AUTH_FAILED: &str = "AUTH_FAILED";
 
 /// Marker for an explicit `ControlMessage::Error` rejection from the server.
+/// This alone is retryable because the response can hide temporary exhaustion.
 pub const MARKER_SERVER_REJECTED: &str = "Server rejected connection";
 
 /// Marker for a server-pushed MTU that differs from the client's pinned MTU.
@@ -31,7 +34,6 @@ pub const MARKER_UNSUPPORTED_MTU: &str = "unsupported VPN MTU";
 /// Markers every platform treats as permanent, regardless of OS.
 pub const COMMON_PERMANENT_MARKERS: &[&str] = &[
     MARKER_AUTH_FAILED,
-    MARKER_SERVER_REJECTED,
     MARKER_MTU_MISMATCH,
     MARKER_UNSUPPORTED_MTU,
 ];
@@ -59,7 +61,6 @@ mod tests {
     fn common_markers_are_permanent_without_platform_markers() {
         for message in [
             "AUTH_FAILED: Server returned HTML (camouflage response)",
-            "Server rejected connection: bad token",
             "MTU mismatch: local/client VPN MTU is 1280, but server pushed 1360",
             "Server pushed unsupported VPN MTU 9000. Supported range is 1280-1360.",
         ] {
@@ -75,6 +76,14 @@ mod tests {
             &[]
         ));
         assert!(!is_permanent_session_error("", &[]));
+    }
+
+    #[test]
+    fn generic_server_rejection_is_retryable() {
+        // The server intentionally uses the same response for bad credentials
+        // and temporary principal/IP capacity exhaustion.
+        let message = format!("{MARKER_SERVER_REJECTED}: Unauthorized");
+        assert!(!is_permanent_session_error(&message, &[]));
     }
 
     #[test]

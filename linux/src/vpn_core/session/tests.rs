@@ -36,7 +36,6 @@ async fn backoff_sleep_completes_full_delay_when_running() {
 fn permanent_setup_errors_stop_reconnect_loop() {
     for message in [
         "AUTH_FAILED: Server returned HTTP 401",
-        "Server rejected connection: denied",
         "MTU mismatch: local/client VPN MTU is 1280, but server pushed 1360",
         "Server pushed unsupported VPN MTU 1400",
         "Failed to open /dev/net/tun: permission denied",
@@ -55,3 +54,12 @@ fn transient_transport_errors_keep_reconnect_loop() {
         "timed out while reading datagram"
     ));
 }
+
+#[test]
+fn generic_server_rejection_keeps_reconnect_loop() {
+    assert!(!is_permanent_setup_error(
+        "Server rejected connection: Unauthorized"
+    ));
+}
+
+mod rejection;

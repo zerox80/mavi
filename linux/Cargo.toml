@@ -50,5 +50,6 @@ nix = { version = "0.31", features = ["ioctl", "net", "fs", "user"] }
 keyring = "4.1"
 
 [dev-dependencies]
+rcgen = { workspace = true }
 tempfile = { workspace = true }
 

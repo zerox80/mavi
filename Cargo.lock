@@ -2597,6 +2597,7 @@ dependencies = [
  "nix",
  "quinn",
  "rand 0.10.2",
+ "rcgen",
  "reqwest",
  "rustls",
  "serde",
