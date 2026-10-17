@@ -28,6 +28,9 @@ pub use transport::ipc_token_path;
 /// login for the active session.
 pub const KEYCLOAK_LOGIN_REQUIRED_PREFIX: &str = "KEYCLOAK_LOGIN_REQUIRED:";
 
+/// Reserved profile ID for the Windows CLI's separately stored credentials.
+pub const WINDOWS_CLI_CONNECTION_ID: &str = "windows-cli";
+
 /// Configuration required to establish a VPN session.
 /// Passed from the client to the service via IPC.
 #[derive(Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -176,7 +179,7 @@ pub enum IpcRequest {
         config: Config,
         keycloak: KeycloakRuntimeAuth,
     },
-    /// Fetch a rotated refresh token awaiting persistence. Kept under its
+    /// Fetch a GUI refresh token awaiting persistence. Kept under its
     /// original wire tag, but fetching no longer clears the pending update.
     TakeRefreshTokenUpdate,
     /// Start a session whose GUI refresh requests carry a fresh per-start ID.
@@ -194,6 +197,9 @@ pub enum IpcRequest {
         connection_id: String,
         refresh_token: String,
     },
+    /// Fetch only the named profile's pending rotation, without consuming it
+    /// or another frontend's update. Confirm storage with an acknowledgement.
+    TakeRefreshTokenUpdateFor { connection_id: String },
 }
 
 impl fmt::Debug for IpcRequest {
@@ -235,6 +241,10 @@ impl fmt::Debug for IpcRequest {
                 .debug_struct("AcknowledgeRefreshTokenUpdate")
                 .field("connection_id", connection_id)
                 .field("refresh_token", &"<redacted>")
+                .finish(),
+            Self::TakeRefreshTokenUpdateFor { connection_id } => f
+                .debug_struct("TakeRefreshTokenUpdateFor")
+                .field("connection_id", connection_id)
                 .finish(),
         }
     }

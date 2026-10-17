@@ -134,3 +134,110 @@ async fn queued_request_rechecks_console_after_acquiring_state_lock() {
     assert!(matches!(task.await.unwrap(), ipc::IpcResponse::Error(_)));
     assert!(state.lock().await.current_token.lock().unwrap().is_empty());
 }
+
+#[tokio::test]
+async fn cli_and_gui_rotations_are_delivered_to_their_own_stores_after_stop() {
+    let state = Arc::new(Mutex::new(VpnServiceState::new()));
+    let alice = user("S-1-5-21-1", 1);
+    let bob = user("S-1-5-21-2", 2);
+    {
+        let mut guard = state.lock().await;
+        // The GUI's older, unacknowledged update must not block the CLI fetch.
+        for connection_id in ["gui-profile", ipc::WINDOWS_CLI_CONNECTION_ID] {
+            guard.mark_session_starting(
+                &alice.owner.refresh_token_key(),
+                crate::tests::test_config(),
+                Some(connection_id),
+            );
+            guard
+                .runtime_handles()
+                .publish_keycloak_refresh_token(PendingKeycloakRefreshToken {
+                    connection_id: connection_id.into(),
+                    refresh_token: format!("{connection_id}-secret"),
+                });
+            guard.stop_session();
+        }
+    }
+    let cli_request = ipc::IpcRequest::TakeRefreshTokenUpdateFor {
+        connection_id: ipc::WINDOWS_CLI_CONNECTION_ID.into(),
+    };
+    assert!(matches!(
+        dispatch_as(cli_request.clone(), &state, &bob, || Some((
+            bob.owner.sid.clone(),
+            2
+        )))
+        .await,
+        ipc::IpcResponse::RefreshTokenUpdate {
+            connection_id: None,
+            refresh_token: None
+        }
+    ));
+    for (request, expected) in [
+        (cli_request, ipc::WINDOWS_CLI_CONNECTION_ID),
+        (ipc::IpcRequest::TakeRefreshTokenUpdate, "gui-profile"),
+    ] {
+        let response = dispatch_as(request, &state, &alice, || {
+            Some((alice.owner.sid.clone(), 1))
+        })
+        .await;
+        assert_eq!(
+            response,
+            ipc::IpcResponse::RefreshTokenUpdate {
+                connection_id: Some(expected.into()),
+                refresh_token: Some(format!("{expected}-secret")),
+            }
+        );
+        let _ = dispatch_as(
+            ipc::IpcRequest::AcknowledgeRefreshTokenUpdate {
+                connection_id: expected.into(),
+                refresh_token: format!("{expected}-secret"),
+            },
+            &state,
+            &alice,
+            || Some((alice.owner.sid.clone(), 1)),
+        )
+        .await;
+    }
+    assert!(state
+        .lock()
+        .await
+        .pending_keycloak_refresh_token(&alice.owner.refresh_token_key())
+        .is_none());
+    // Conversely, GUI polling must skip a CLI update even when it is first.
+    {
+        let mut guard = state.lock().await;
+        guard.mark_session_starting(
+            &alice.owner.refresh_token_key(),
+            crate::tests::test_config(),
+            Some(ipc::WINDOWS_CLI_CONNECTION_ID),
+        );
+        guard
+            .runtime_handles()
+            .publish_keycloak_refresh_token(PendingKeycloakRefreshToken {
+                connection_id: ipc::WINDOWS_CLI_CONNECTION_ID.into(),
+                refresh_token: "another-cli-secret".into(),
+            });
+        guard.stop_session();
+    }
+    assert!(matches!(
+        dispatch_as(
+            ipc::IpcRequest::TakeRefreshTokenUpdate,
+            &state,
+            &alice,
+            || Some((alice.owner.sid.clone(), 1))
+        )
+        .await,
+        ipc::IpcResponse::RefreshTokenUpdate {
+            connection_id: None,
+            refresh_token: None
+        }
+    ));
+    assert!(state
+        .lock()
+        .await
+        .pending_keycloak_refresh_token_for(
+            &alice.owner.refresh_token_key(),
+            ipc::WINDOWS_CLI_CONNECTION_ID
+        )
+        .is_some());
+}

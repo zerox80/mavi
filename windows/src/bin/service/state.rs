@@ -298,6 +298,24 @@ impl VpnServiceState {
         &self,
         caller_key: &str,
     ) -> Option<PendingKeycloakRefreshToken> {
+        self.find_pending_keycloak_refresh_token(caller_key, |id| {
+            id != ipc::WINDOWS_CLI_CONNECTION_ID
+        })
+    }
+
+    pub fn pending_keycloak_refresh_token_for(
+        &self,
+        caller_key: &str,
+        connection_id: &str,
+    ) -> Option<PendingKeycloakRefreshToken> {
+        self.find_pending_keycloak_refresh_token(caller_key, |id| id == connection_id)
+    }
+
+    fn find_pending_keycloak_refresh_token(
+        &self,
+        caller_key: &str,
+        accepts: impl Fn(&str) -> bool,
+    ) -> Option<PendingKeycloakRefreshToken> {
         self.pending_keycloak_refresh_tokens
             .lock()
             .ok()
@@ -305,7 +323,9 @@ impl VpnServiceState {
                 pending
                     .updates
                     .iter()
-                    .find(|queued| queued.owner_key == caller_key)
+                    .find(|queued| {
+                        queued.owner_key == caller_key && accepts(&queued.update.connection_id)
+                    })
                     .map(|queued| queued.update.clone())
             })
     }

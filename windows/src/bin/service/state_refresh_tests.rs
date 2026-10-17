@@ -157,3 +157,35 @@ fn starting_without_keycloak_preserves_all_unsaved_rotations() {
         Some(update("profile", "unsaved-rotation"))
     );
 }
+
+#[test]
+fn cli_and_gui_fetches_skip_each_others_pending_rotations() {
+    use crate::ipc::WINDOWS_CLI_CONNECTION_ID;
+
+    let mut state = VpnServiceState::new();
+    for profile in [WINDOWS_CLI_CONNECTION_ID, "gui-profile"] {
+        state.mark_session_starting(TEST_USER_SID, test_config(), Some(profile));
+        state
+            .runtime_handles()
+            .publish_keycloak_refresh_token(update(profile, profile));
+        state.stop_session();
+    }
+    assert_eq!(
+        state.pending_keycloak_refresh_token(TEST_USER_SID),
+        Some(update("gui-profile", "gui-profile"))
+    );
+    assert_eq!(
+        state.pending_keycloak_refresh_token_for(TEST_USER_SID, WINDOWS_CLI_CONNECTION_ID),
+        Some(update(WINDOWS_CLI_CONNECTION_ID, WINDOWS_CLI_CONNECTION_ID))
+    );
+    assert!(state
+        .pending_keycloak_refresh_token_for("other-logon", WINDOWS_CLI_CONNECTION_ID)
+        .is_none());
+    state.acknowledge_keycloak_refresh_token(TEST_USER_SID, "gui-profile", "gui-profile");
+    assert!(state
+        .pending_keycloak_refresh_token(TEST_USER_SID)
+        .is_none());
+    assert!(state
+        .pending_keycloak_refresh_token_for(TEST_USER_SID, WINDOWS_CLI_CONNECTION_ID)
+        .is_some());
+}

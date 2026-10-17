@@ -131,6 +131,9 @@ async fn sensitive_requests_require_identity_but_status_and_stop_remain_availabl
             keycloak: keycloak_auth(),
         },
         ipc::IpcRequest::TakeRefreshTokenUpdate,
+        ipc::IpcRequest::TakeRefreshTokenUpdateFor {
+            connection_id: ipc::WINDOWS_CLI_CONNECTION_ID.into(),
+        },
         ipc::IpcRequest::AcknowledgeRefreshTokenUpdate {
             connection_id: "profile".into(),
             refresh_token: "secret".into(),
