@@ -3,6 +3,10 @@ use anyhow::{Context, Result};
 use serde::Deserialize;
 use std::net::{IpAddr, Ipv4Addr};
 
+// Distinct from the IPv6 block marker (242). Kernel ownership survives a
+// process crash without a journal containing physical-interface routes.
+const HOST_ROUTE_PROTOCOL: &str = "243";
+
 /// A host route newly installed by this session, with its cleanup selectors.
 #[derive(Debug, PartialEq, Eq)]
 pub(super) struct HostRoute {
@@ -141,10 +145,31 @@ fn host_route_args(
         args.extend(["via".to_string(), gw.to_string()]);
     }
     args.extend(["dev".to_string(), device.to_string()]);
+    args.extend(["proto".to_string(), HOST_ROUTE_PROTOCOL.to_string()]);
     if action == "add" && onlink && gateway.is_some() {
         args.push("onlink".to_string());
     }
     args
+}
+
+pub(super) fn remove_stale_host_routes(runner: &mut impl CommandRunner) -> Result<()> {
+    for family in ["-4", "-6"] {
+        runner
+            .run(
+                "ip",
+                &[
+                    family,
+                    "route",
+                    "flush",
+                    "table",
+                    "main",
+                    "proto",
+                    HOST_ROUTE_PROTOCOL,
+                ],
+            )
+            .context("Could not remove stale Mavi host route exceptions")?;
+    }
+    Ok(())
 }
 
 /// Removes only newly installed exceptions, using their original selectors.
@@ -187,7 +212,15 @@ mod tests {
             (
                 "192.168.20.5",
                 r#"[{"dst":"192.168.20.5","dev":"eth1"}]"#,
-                vec!["route", "add", "192.168.20.5/32", "dev", "eth1"],
+                vec![
+                    "route",
+                    "add",
+                    "192.168.20.5/32",
+                    "dev",
+                    "eth1",
+                    "proto",
+                    "243",
+                ],
             ),
             (
                 "203.0.113.10",
@@ -200,6 +233,8 @@ mod tests {
                     "192.0.2.99",
                     "dev",
                     "eth1",
+                    "proto",
+                    "243",
                 ],
             ),
             (
@@ -214,6 +249,8 @@ mod tests {
                     "fe80::99",
                     "dev",
                     "eth1",
+                    "proto",
+                    "243",
                 ],
             ),
         ] {
@@ -290,11 +327,28 @@ mod tests {
         for (ip, expected) in [
             (
                 "203.0.113.10",
-                vec!["route", "add", "203.0.113.10/32", "dev", "ppp0"],
+                vec![
+                    "route",
+                    "add",
+                    "203.0.113.10/32",
+                    "dev",
+                    "ppp0",
+                    "proto",
+                    "243",
+                ],
             ),
             (
                 "2001:db8::10",
-                vec!["-6", "route", "add", "2001:db8::10/128", "dev", "ppp0"],
+                vec![
+                    "-6",
+                    "route",
+                    "add",
+                    "2001:db8::10/128",
+                    "dev",
+                    "ppp0",
+                    "proto",
+                    "243",
+                ],
             ),
         ] {
             let mut runner = RecordingRunner::default();
@@ -322,11 +376,28 @@ mod tests {
     fn gatewayless_cleanup_keeps_the_original_interface_selector() {
         assert_eq!(
             host_route_args("203.0.113.10".parse().unwrap(), "del", None, "ppp0", false),
-            ["route", "del", "203.0.113.10/32", "dev", "ppp0"]
+            [
+                "route",
+                "del",
+                "203.0.113.10/32",
+                "dev",
+                "ppp0",
+                "proto",
+                "243"
+            ]
         );
         assert_eq!(
             host_route_args("2001:db8::10".parse().unwrap(), "del", None, "ppp0", false),
-            ["-6", "route", "del", "2001:db8::10/128", "dev", "ppp0"]
+            [
+                "-6",
+                "route",
+                "del",
+                "2001:db8::10/128",
+                "dev",
+                "ppp0",
+                "proto",
+                "243"
+            ]
         );
     }
 
