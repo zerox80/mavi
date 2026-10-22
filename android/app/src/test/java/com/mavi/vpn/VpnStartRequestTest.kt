@@ -42,8 +42,8 @@ class VpnStartRequestTest {
     }
 
     @Test
-    fun stopAndUnknownActionsLeaveConfigurationUntouched() {
-        for (action in listOf("STOP", "unknown")) {
+    fun stopPauseResumeAndUnknownActionsLeaveConfigurationUntouched() {
+        for (action in listOf("STOP", ACTION_PAUSE, ACTION_RESUME, "unknown")) {
             assertNull(
                 resolveVpnStartRequest(
                     action = action,

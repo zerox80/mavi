@@ -128,6 +128,8 @@ class MainActivity : ComponentActivity() {
                                 }
                             },
                             onDisconnect = { stopVpn() },
+                            onPause = { minutes -> pauseVpn(minutes) },
+                            onResume = { sendServiceAction(ACTION_RESUME) },
                             onOpenSettings = { currentScreen = "settings" },
                         )
                         "settings" -> SettingsScreen(
@@ -254,8 +256,19 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun stopVpn() {
+        sendServiceAction("STOP")
+    }
+
+    private fun pauseVpn(minutes: Int) {
         val intent = Intent(this, MaviVpnService::class.java)
-        intent.action = "STOP"
+        intent.action = ACTION_PAUSE
+        intent.putExtra(EXTRA_PAUSE_MINUTES, minutes)
+        startService(intent)
+    }
+
+    private fun sendServiceAction(action: String) {
+        val intent = Intent(this, MaviVpnService::class.java)
+        intent.action = action
         startService(intent)
     }
 

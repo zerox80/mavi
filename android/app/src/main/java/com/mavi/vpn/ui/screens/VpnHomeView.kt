@@ -29,6 +29,7 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -45,6 +46,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.mavi.vpn.VpnConnectionState
 import com.mavi.vpn.OAuthHelper
+import com.mavi.vpn.formatPauseRemaining
 import com.mavi.vpn.ui.components.MaviCore
 import com.mavi.vpn.ui.components.MaviCoreState
 import com.mavi.vpn.ui.components.MaviTextField
@@ -58,6 +60,8 @@ fun HomeView(
     connectionState: VpnConnectionState,
     onConnect: (String, String, String, String) -> Unit,
     onDisconnect: () -> Unit,
+    onPause: (Int) -> Unit,
+    onResume: () -> Unit,
     onOpenSettings: () -> Unit,
     onGoToConfig: () -> Unit,
 ) {
@@ -69,11 +73,14 @@ fun HomeView(
     val certPin by viewModel.certPin.collectAsState()
     val useKeycloak by viewModel.useKeycloak.collectAsState()
     val kcUrl by viewModel.kcUrl.collectAsState()
+    val pausedUntil by viewModel.pausedUntil.collectAsState()
     val hasKeycloakRefreshToken = viewModel.hasSavedKeycloakRefreshToken()
 
     val isConnected = connectionState == VpnConnectionState.CONNECTED
     val isConnecting = connectionState == VpnConnectionState.CONNECTING ||
         connectionState == VpnConnectionState.RECONNECTING
+    val isPaused = connectionState == VpnConnectionState.PAUSED
+    val pauseRemaining = rememberPauseRemainingMillis(if (isPaused) pausedUntil else 0L)
     val state = when {
         isConnected -> MaviCoreState.ON
         isConnecting -> MaviCoreState.CONNECTING
@@ -84,8 +91,15 @@ fun HomeView(
         VpnConnectionState.CONNECTING -> "CONNECTING"
         VpnConnectionState.CONNECTED -> "ENCRYPTED"
         VpnConnectionState.RECONNECTING -> "RECONNECTING"
+        VpnConnectionState.PAUSED -> "PAUSED"
     }
-    val labelColor = if (isConnected) T.ok else if (isConnecting) T.accent else T.mute
+    val labelColor = if (isConnected) T.ok else if (isConnecting) T.accent else if (isPaused) T.warn else T.mute
+    val statusDetail = when {
+        isConnected -> "tunnel active"
+        isConnecting -> "connecting…"
+        isPaused -> "resumes in ${formatPauseRemaining(pauseRemaining)}"
+        else -> "ready"
+    }
     val isDark = androidx.compose.foundation.isSystemInDarkTheme()
 
     Column(
@@ -147,7 +161,7 @@ fun HomeView(
         )
         Spacer(modifier = Modifier.height(4.dp))
         Text(
-            text = "Port $serverPort · ${if (isConnected) "tunnel active" else if (isConnecting) "connecting…" else "ready"}",
+            text = "Port $serverPort · $statusDetail",
             fontSize = 13.sp,
             color = T.ink2
         )
@@ -157,7 +171,9 @@ fun HomeView(
         // Connect Button
         Button(
             onClick = {
-                if (connectionState.canStop) {
+                if (isPaused) {
+                    onResume()
+                } else if (connectionState.canStop) {
                     onDisconnect()
                 } else {
                     viewModel.updateErrorMessage("")
@@ -199,11 +215,21 @@ fun HomeView(
                 )
         ) {
             Text(
-                text = if (isConnected) "Disconnect" else if (isConnecting) "Cancel" else "Connect",
+                text = if (isConnected) "Disconnect" else if (isConnecting) "Cancel" else if (isPaused) "Resume now" else "Connect",
                 fontSize = 15.sp,
                 fontWeight = FontWeight.SemiBold,
                 letterSpacing = 0.3.sp
             )
+        }
+
+        if (connectionState.canPause) {
+            Spacer(modifier = Modifier.height(20.dp))
+            PauseOptions(onPause = onPause)
+        } else if (isPaused) {
+            Spacer(modifier = Modifier.height(8.dp))
+            TextButton(onClick = onDisconnect) {
+                Text("Disconnect", fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = T.ink2)
+            }
         }
 
         Spacer(modifier = Modifier.weight(1f))

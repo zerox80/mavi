@@ -71,6 +71,7 @@ class VpnViewModel(
     val errorMessage: StateFlow<String> = _errorMessage.asStateFlow()
 
     val connectionState = MaviVpnService.connectionState
+    val pausedUntil = MaviVpnService.pausedUntil
 
     init {
         // We only clear out token entirely if the token is completely

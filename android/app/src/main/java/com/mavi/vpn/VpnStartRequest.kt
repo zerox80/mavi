@@ -20,7 +20,10 @@ internal fun resolveVpnStartRequest(
 ): VpnStartRequest? =
     resolveVpnStartRequest(
         action = intent?.action,
-        savedRequest = { savedVpnStartRequest(prefs) },
+        savedRequest = {
+            Log.i("MaviVPN", "Service restarted by System. Reloading credentials...")
+            savedVpnStartRequest(prefs)
+        },
         connectRequest = { connectVpnStartRequest(requireNotNull(intent), prefs) },
     )
 
@@ -37,8 +40,7 @@ internal fun resolveVpnStartRequest(
         else -> null
     }
 
-private fun savedVpnStartRequest(prefs: PrefsManager): VpnStartRequest {
-    Log.i("MaviVPN", "Service restarted by System. Reloading credentials...")
+internal fun savedVpnStartRequest(prefs: PrefsManager): VpnStartRequest {
     // Normal mode keeps its credential in savedPresharedKey, Keycloak mode in
     // an authority-bound record. Pick the active mode so a system restart
     // reconnects with the matching credential.
