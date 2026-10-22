@@ -6,6 +6,7 @@ import java.util.Base64
 
 /** Minimal in-memory implementation of the Android preferences contract. */
 internal class MemoryPreferences {
+    var commitSucceeds = true
     private val values = mutableMapOf<String, Any>()
     val prefs: SharedPreferences =
         Proxy.newProxyInstance(
@@ -38,7 +39,7 @@ internal class MemoryPreferences {
                     changes.forEach { (key, value) ->
                         if (value == null) values.remove(key) else values[key] = value
                     }
-                    if (method.name == "commit") true else null
+                    if (method.name == "commit") commitSucceeds else null
                 }
                 else -> error("Unexpected editor call: ${method.name}")
             }

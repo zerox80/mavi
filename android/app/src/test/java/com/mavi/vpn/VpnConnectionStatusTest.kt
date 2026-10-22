@@ -41,4 +41,31 @@ class VpnConnectionStatusTest {
         status.start()
         assertEquals(VpnConnectionState.CONNECTING, status.state.value)
     }
+
+    @Test
+    fun pausedTunnelIgnoresLateWorkerUpdatesUntilResumedOrStopped() {
+        val status = VpnConnectionStatus()
+        status.start()
+        status.connected(true)
+        assertTrue(status.state.value.canPause)
+
+        status.pause(resumeAtMillis = 42L)
+        assertEquals(VpnConnectionState.PAUSED, status.state.value)
+        assertEquals(42L, status.pausedUntil.value)
+        assertTrue(status.state.value.canStop)
+        assertFalse(status.state.value.canPause)
+        status.connected(true)
+        status.connected(false)
+        assertEquals(VpnConnectionState.PAUSED, status.state.value)
+
+        status.start()
+        assertEquals(VpnConnectionState.CONNECTING, status.state.value)
+        assertEquals(0L, status.pausedUntil.value)
+        assertFalse(status.state.value.canPause)
+
+        status.pause(resumeAtMillis = 7L)
+        status.stop()
+        assertEquals(VpnConnectionState.STOPPED, status.state.value)
+        assertEquals(0L, status.pausedUntil.value)
+    }
 }

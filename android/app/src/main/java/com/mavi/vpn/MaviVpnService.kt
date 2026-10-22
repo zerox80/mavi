@@ -1,5 +1,6 @@
 package com.mavi.vpn
 
+import android.app.Notification
 import android.content.Context
 import android.content.Intent
 import android.net.ConnectivityManager
@@ -9,6 +10,7 @@ import android.os.Build
 import android.os.ParcelFileDescriptor
 import android.os.PowerManager
 import android.util.Log
+import android.widget.Toast
 import com.mavi.vpn.data.PrefsManager
 import com.mavi.vpn.nativelib.NativeLib
 import com.mavi.vpn.service.NotificationHelper
@@ -24,6 +26,7 @@ class MaviVpnService : VpnService() {
     @Volatile private var networkCallback: ConnectivityManager.NetworkCallback? = null
 
     @Volatile private var isRunning = false
+    private var isForeground = false
     private var wakeLock: PowerManager.WakeLock? = null
     private val vpnLock = Any()
 
@@ -34,10 +37,13 @@ class MaviVpnService : VpnService() {
     private lateinit var prefs: PrefsManager
     private lateinit var notificationHelper: NotificationHelper
     private lateinit var tokenManager: KeycloakTokenManager
+    private lateinit var pauseScheduler: VpnPauseScheduler
+    private lateinit var pauseRecovery: VpnPauseRecovery
 
     companion object {
         private val connectionStatus = VpnConnectionStatus()
         val connectionState = connectionStatus.state
+        val pausedUntil = connectionStatus.pausedUntil
     }
 
     override fun onCreate() {
@@ -45,6 +51,8 @@ class MaviVpnService : VpnService() {
         prefs = PrefsManager(this)
         notificationHelper = NotificationHelper(this)
         tokenManager = KeycloakTokenManager(PrefsKeycloakTokenStore(prefs))
+        pauseScheduler = VpnPauseScheduler(this, ::resumeVpn)
+        pauseRecovery = VpnPauseRecovery(getSharedPreferences("MaviVPN", Context.MODE_PRIVATE))
     }
 
     override fun onStartCommand(
@@ -54,26 +62,83 @@ class MaviVpnService : VpnService() {
     ): Int {
         val action = intent?.action
 
-        if (action == "STOP") {
-            stopVpn()
-            return START_NOT_STICKY
+        when (action) {
+            "STOP" -> {
+                stopVpn()
+                return START_NOT_STICKY
+            }
+            ACTION_PAUSE -> {
+                pauseVpn(intent.getIntExtra(EXTRA_PAUSE_MINUTES, 0))
+                return stickyWhileActive()
+            }
+            ACTION_RESUME -> {
+                resumeVpn()
+                return stickyWhileActive()
+            }
         }
 
         val request = resolveVpnStartRequest(intent, prefs)
-        if (request != null) {
-            val hasCredentials = vpnStartHasCredentials(prefs, request.token)
-
-            if (request.ip.isNotEmpty() && hasCredentials) {
-                startVpn(request)
-                return START_STICKY
-            } else {
-                Log.e("MaviVPN", "Cannot restart: Credentials missing.")
-            }
+        if (request != null && startVpnIfConfigured(request)) {
+            return START_STICKY
         }
         return START_NOT_STICKY
     }
 
+    // Keeps a paused session sticky too: if the process dies mid-pause, the
+    // system restart reconnects instead of leaving the tunnel off for good.
+    private fun stickyWhileActive(): Int = if (connectionStatus.state.value.canStop) START_STICKY else START_NOT_STICKY
+
+    private fun startVpnIfConfigured(request: VpnStartRequest): Boolean {
+        if (request.ip.isEmpty() || !vpnStartHasCredentials(prefs, request.token)) {
+            Log.e("MaviVPN", "Cannot restart: Credentials missing.")
+            return false
+        }
+        startVpn(request)
+        return true
+    }
+
+    /** Tears the tunnel down but keeps the service in the foreground while
+     *  waiting for automatic resume. Android may delay the wakeup alarm. */
+    private fun pauseVpn(minutes: Int) {
+        val durationMillis = pauseDurationMillis(minutes)
+        if (durationMillis == null) {
+            Log.w("MaviVPN", "Ignoring pause request with unsupported duration: $minutes min")
+            return
+        }
+        if (!connectionStatus.state.value.canStop) return
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && isLockdownEnabled) {
+            // With "Block connections without VPN" a pause would only cut the device off.
+            Toast.makeText(this, "Pause is unavailable while Android blocks connections without VPN.", Toast.LENGTH_LONG).show()
+            return
+        }
+
+        if (!pauseRecovery.markPaused()) {
+            Log.e("MaviVPN", "Cannot pause: failed to persist resume state.")
+            Toast.makeText(this, "Could not save VPN pause. Please try again.", Toast.LENGTH_LONG).show()
+            return
+        }
+
+        val cleanup = invalidateCurrentSession()
+        stopCurrentSession(cleanup)
+        releaseWakeLock()
+
+        val resumeAt = System.currentTimeMillis() + durationMillis
+        connectionStatus.pause(resumeAt)
+        pauseScheduler.schedule(durationMillis)
+        showForegroundNotification(notificationHelper.createPausedNotification(resumeAt))
+        Log.i("MaviVPN", "VPN paused for $minutes min")
+    }
+
+    private fun resumeVpn() {
+        if (!pauseRecovery.canResume(connectionStatus.state.value)) return
+        Log.i("MaviVPN", "Resuming paused VPN")
+        if (!startVpnIfConfigured(savedVpnStartRequest(prefs))) {
+            stopVpn()
+        }
+    }
+
     private fun startVpn(request: VpnStartRequest) {
+        pauseScheduler.cancel()
         val cleanup = invalidateCurrentSession()
         stopCurrentSession(cleanup)
         val sessionGeneration = cleanup.generation
@@ -87,7 +152,8 @@ class MaviVpnService : VpnService() {
 
         isRunning = true
         connectionStatus.start()
-        startForeground(1, notification)
+        showForegroundNotification(notification)
+        clearPendingPause()
 
         val callbacks =
             VpnSessionCallbacks(
@@ -158,11 +224,19 @@ class MaviVpnService : VpnService() {
     }
 
     private fun stopVpn() {
+        clearPendingPause()
         tearDownVpnSession()
         stopSelf()
     }
 
+    private fun clearPendingPause() {
+        if (!pauseRecovery.clear()) {
+            Log.w("MaviVPN", "Failed to clear persisted pause state")
+        }
+    }
+
     private fun tearDownVpnSession() {
+        pauseScheduler.cancel()
         val cleanup = invalidateCurrentSession()
         stopCurrentSession(cleanup)
 
@@ -172,8 +246,20 @@ class MaviVpnService : VpnService() {
             @Suppress("DEPRECATION")
             stopForeground(true)
         }
+        isForeground = false
 
         releaseWakeLock()
+    }
+
+    /** A service that is already in the foreground (e.g. resuming from a pause
+     *  via alarm) only swaps its notification instead of re-entering foreground. */
+    private fun showForegroundNotification(notification: Notification) {
+        if (isForeground) {
+            notificationHelper.notify(1, notification)
+        } else {
+            startForeground(1, notification)
+            isForeground = true
+        }
     }
 
     private fun invalidateCurrentSession(): SessionCleanup {

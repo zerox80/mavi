@@ -61,6 +61,8 @@ fun VpnScreen(
     viewModel: VpnViewModel,
     onConnect: (String, String, String, String) -> Unit,
     onDisconnect: () -> Unit,
+    onPause: (Int) -> Unit,
+    onResume: () -> Unit,
     onOpenSettings: () -> Unit,
 ) {
     val context = LocalContext.current
@@ -107,6 +109,8 @@ fun VpnScreen(
                         connectionState = connectionState,
                         onConnect = onConnect,
                         onDisconnect = onDisconnect,
+                        onPause = onPause,
+                        onResume = onResume,
                         onOpenSettings = onOpenSettings,
                         onGoToConfig = { currentTab = "config" },
                     )
