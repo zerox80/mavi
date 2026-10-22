@@ -10,11 +10,6 @@ db-urls = ["https://github.com/rustsec/advisory-db"]
 # that the two lists match exactly and refuses expired exceptions.
 ignore = [
   "RUSTSEC-2024-0370", # proc-macro-error (tauri dependency)
-  "RUSTSEC-2025-0081", # unic-char-property (tauri dependency)
-  "RUSTSEC-2025-0075", # unic-char-range (tauri dependency)
-  "RUSTSEC-2025-0080", # unic-common (tauri dependency)
-  "RUSTSEC-2025-0100", # unic-ucd-ident (tauri dependency)
-  "RUSTSEC-2025-0098", # unic-ucd-version (tauri dependency)
   "RUSTSEC-2024-0413", # atk (tauri dependency - GTK3)
   "RUSTSEC-2024-0416", # atk-sys (tauri dependency - GTK3)
   "RUSTSEC-2024-0412", # gdk (tauri dependency - GTK3)
@@ -26,8 +21,9 @@ ignore = [
   "RUSTSEC-2024-0420", # gtk-sys (tauri dependency - GTK3)
   "RUSTSEC-2024-0419", # gtk3-macros (tauri dependency - GTK3)
   "RUSTSEC-2024-0429", # glib via Tauri GTK3; affected VariantStrIter API is not used
-  "RUSTSEC-2026-0194", # quick-xml via tauri/plist; no released tauri/plist fix to quick-xml >= 0.41 yet
-  "RUSTSEC-2026-0195", # quick-xml via tauri/plist; no released tauri/plist fix to quick-xml >= 0.41 yet
+  "RUSTSEC-2026-0370", # zvariant via Linux keyring; upstream migration to zbus 6 pending
+  "RUSTSEC-2026-0371", # zbus_names via Linux keyring; upstream migration to zbus 6 pending
+  "RUSTSEC-2026-0372", # zvariant_derive via Linux keyring; upstream migration to zbus 6 pending
 ]
 
 [licenses]
@@ -66,5 +62,4 @@ allow-git = [
   "https://github.com/zerox80/h2",
   "https://github.com/zerox80/quinn",
   "https://github.com/zerox80/h3",
-  "https://github.com/time-rs/time",
 ]
