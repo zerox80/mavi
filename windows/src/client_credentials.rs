@@ -7,6 +7,32 @@ use std::time::Duration;
 use crate::ipc::{IpcRequest, IpcResponse, WINDOWS_CLI_CONNECTION_ID};
 use crate::secrets::{config_refresh_token_account, SecretStore};
 
+/// Check before performing OAuth: refreshing here would consume credentials
+/// still owned by the active service worker even though Start will be rejected.
+pub(crate) async fn prepare_start<F, Fut>(
+    response: IpcResponse,
+    prepare: F,
+) -> Result<crate::ipc::Config>
+where
+    F: FnOnce() -> Fut,
+    Fut: Future<Output = Result<crate::ipc::Config>>,
+{
+    ensure_can_start(response)?;
+    prepare().await
+}
+
+fn ensure_can_start(response: IpcResponse) -> Result<()> {
+    match response {
+        IpcResponse::Status {
+            state: crate::ipc::VpnState::Stopped | crate::ipc::VpnState::Failed,
+            ..
+        } => Ok(()),
+        IpcResponse::Status { .. } => anyhow::bail!("VPN is already running or stopping"),
+        IpcResponse::Error(error) => anyhow::bail!("Service returned an error: {error}"),
+        _ => anyhow::bail!("Unexpected status response from service"),
+    }
+}
+
 /// Serialize fetch/save/acknowledge and login/start across CLI processes using
 /// the same keyring account. Closing the file also releases a cancelled lock.
 pub(crate) async fn lock_credentials(config_path: &Path) -> Result<File> {
