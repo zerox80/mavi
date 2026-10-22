@@ -51,8 +51,8 @@ android {
         applicationId = "com.mavi.vpn"
         minSdk = 26 // Android 8.0 (Oreo) for better VpnService support
         targetSdk = 36
-        versionCode = 5
-        versionName = "1.1.0"
+        versionCode = 6
+        versionName = "1.3.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         manifestPlaceholders["oauthRedirectScheme"] =
