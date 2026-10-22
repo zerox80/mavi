@@ -128,7 +128,7 @@ impl Config {
     }
 }
 
-/// Active Keycloak session data passed to the Windows service for in-service
+/// Active Keycloak session data passed to the service/daemon for background
 /// refresh. This data is for RAM-only runtime use; clients must not persist or
 /// log the refresh token through IPC diagnostics.
 #[derive(Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -173,7 +173,7 @@ pub enum IpcRequest {
     /// authenticates with a valid token instead of the stale one captured at
     /// `Start`. Windows service-side refresh uses `StartWithKeycloak` instead.
     UpdateToken { token: String },
-    /// Start the VPN tunnel and let the Windows service refresh the active
+    /// Start the VPN tunnel and let the service/daemon refresh the active
     /// Keycloak session in RAM while the tunnel is running.
     StartWithKeycloak {
         config: Config,
