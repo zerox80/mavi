@@ -188,7 +188,8 @@ where
         .await
         .context("HTTP/2 CONNECT-IP response failed")?;
     if response.status() != http::StatusCode::OK {
-        anyhow::bail!("AUTH_FAILED: server returned HTTP {}", response.status());
+        // Authentication and temporary capacity failures share this response.
+        anyhow::bail!("Server rejected connection: HTTP {}", response.status());
     }
     if response
         .headers()
