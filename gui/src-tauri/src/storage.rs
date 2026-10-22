@@ -230,6 +230,36 @@ fn save_prefs_to_dir_with_store(
     prefs: &mut Prefs,
     store: &dyn SecretStore,
 ) -> Result<(), String> {
+    save_prefs_with_writer(config_dir, prefs, store, |path, content| {
+        write_prefs_atomically(path, content).map_err(|e| e.to_string())
+    })
+}
+
+fn write_prefs_atomically(path: &Path, content: &str) -> std::io::Result<()> {
+    use std::io::Write;
+    let temporary = path.with_extension(format!("{}.tmp", rand::random::<u64>()));
+    let mut file = std::fs::OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(&temporary)?;
+    let result = (|| {
+        file.write_all(content.as_bytes())?;
+        file.sync_all()?;
+        drop(file);
+        std::fs::rename(&temporary, path)
+    })();
+    if result.is_err() {
+        let _ = std::fs::remove_file(&temporary);
+    }
+    result
+}
+
+fn save_prefs_with_writer(
+    config_dir: &Path,
+    prefs: &mut Prefs,
+    store: &dyn SecretStore,
+    write: impl FnOnce(&Path, &str) -> Result<(), String>,
+) -> Result<(), String> {
     std::fs::create_dir_all(config_dir).map_err(|e| e.to_string())?;
     let prefs_path = config_dir.join("prefs.json");
     let previous = if prefs_path.exists() {
@@ -256,21 +286,29 @@ fn save_prefs_to_dir_with_store(
         conn.token = None;
     }
 
+    // Commit the profile list before destroying credentials referenced by the
+    // old file. A failed write must leave those saved profiles usable.
+    let content = serde_json::to_string_pretty(&redacted).map_err(|e| e.to_string())?;
+    write(&prefs_path, &content)?;
+
+    let delete_unused = |account: &str| {
+        if let Err(error) = store.delete_secret(account) {
+            tracing::warn!(%error, "Could not remove an unused saved credential");
+        }
+    };
     for old in previous.connections {
         if let Some(account) = old.refresh_account() {
             let current = redacted.connections.iter().find(|conn| conn.id == old.id);
             if current.and_then(SavedConn::refresh_account).as_ref() != Some(&account) {
-                store.delete_secret(&account)?;
+                delete_unused(&account);
             }
         }
         if !current_ids.contains(&old.id) {
-            store.delete_secret(&connection_token_account(&old.id))?;
-            store.delete_secret(&connection_refresh_token_account(&old.id))?;
+            delete_unused(&connection_token_account(&old.id));
+            delete_unused(&connection_refresh_token_account(&old.id));
         }
     }
 
-    let content = serde_json::to_string_pretty(&redacted).map_err(|e| e.to_string())?;
-    std::fs::write(&prefs_path, content).map_err(|e| e.to_string())?;
     Ok(())
 }
 
