@@ -3,135 +3,112 @@
 # after their expiry. Every exception has a named owner and review deadline.
 # Replacing GTK3/Tauri dependencies is preferred to extending any exception.
 
+# Reviewed 2026-10-22 against Tauri 2.12.5, keyring 4.2.0 and cargo tree --target all.
+# Unicode and quick-xml exceptions were removed after updating Tauri and plist.
+# GTK3/glib remain required by Tauri; keyring still requires the zbus 5 API.
+
 [[exception]]
 id = "RUSTSEC-2024-0370"
 scope = "Linux GUI build dependency via Tauri GTK3 bindings"
 reason = "Unmaintained proc-macro dependency; no compatible Tauri replacement is available."
 owner = "Mavi security maintainers"
-expires = "2026-10-11"
-
-[[exception]]
-id = "RUSTSEC-2025-0081"
-scope = "GUI dependency via Tauri urlpattern"
-reason = "Unmaintained Unicode dependency; no compatible Tauri replacement is available."
-owner = "Mavi security maintainers"
-expires = "2026-10-11"
-
-[[exception]]
-id = "RUSTSEC-2025-0075"
-scope = "GUI dependency via Tauri urlpattern"
-reason = "Unmaintained Unicode dependency; no compatible Tauri replacement is available."
-owner = "Mavi security maintainers"
-expires = "2026-10-11"
-
-[[exception]]
-id = "RUSTSEC-2025-0080"
-scope = "GUI dependency via Tauri urlpattern"
-reason = "Unmaintained Unicode dependency; no compatible Tauri replacement is available."
-owner = "Mavi security maintainers"
-expires = "2026-10-11"
-
-[[exception]]
-id = "RUSTSEC-2025-0100"
-scope = "GUI dependency via Tauri urlpattern"
-reason = "Unmaintained Unicode dependency; no compatible Tauri replacement is available."
-owner = "Mavi security maintainers"
-expires = "2026-10-11"
-
-[[exception]]
-id = "RUSTSEC-2025-0098"
-scope = "GUI dependency via Tauri urlpattern"
-reason = "Unmaintained Unicode dependency; no compatible Tauri replacement is available."
-owner = "Mavi security maintainers"
-expires = "2026-10-11"
+expires = "2027-01-20"
 
 [[exception]]
 id = "RUSTSEC-2024-0413"
 scope = "Linux GUI dependency via Tauri GTK3"
 reason = "GTK3 is transitive from Tauri; no compatible upstream replacement is available."
 owner = "Mavi security maintainers"
-expires = "2026-10-11"
+expires = "2027-01-20"
 
 [[exception]]
 id = "RUSTSEC-2024-0416"
 scope = "Linux GUI dependency via Tauri GTK3"
 reason = "GTK3 is transitive from Tauri; no compatible upstream replacement is available."
 owner = "Mavi security maintainers"
-expires = "2026-10-11"
+expires = "2027-01-20"
 
 [[exception]]
 id = "RUSTSEC-2024-0412"
 scope = "Linux GUI dependency via Tauri GTK3"
 reason = "GTK3 is transitive from Tauri; no compatible upstream replacement is available."
 owner = "Mavi security maintainers"
-expires = "2026-10-11"
+expires = "2027-01-20"
 
 [[exception]]
 id = "RUSTSEC-2024-0418"
 scope = "Linux GUI dependency via Tauri GTK3"
 reason = "GTK3 is transitive from Tauri; no compatible upstream replacement is available."
 owner = "Mavi security maintainers"
-expires = "2026-10-11"
+expires = "2027-01-20"
 
 [[exception]]
 id = "RUSTSEC-2024-0411"
 scope = "Linux GUI dependency via Tauri GTK3"
 reason = "GTK3 is transitive from Tauri; no compatible upstream replacement is available."
 owner = "Mavi security maintainers"
-expires = "2026-10-11"
+expires = "2027-01-20"
 
 [[exception]]
 id = "RUSTSEC-2024-0417"
 scope = "Linux GUI dependency via Tauri GTK3"
 reason = "GTK3 is transitive from Tauri; no compatible upstream replacement is available."
 owner = "Mavi security maintainers"
-expires = "2026-10-11"
+expires = "2027-01-20"
 
 [[exception]]
 id = "RUSTSEC-2024-0414"
 scope = "Linux GUI dependency via Tauri GTK3"
 reason = "GTK3 is transitive from Tauri; no compatible upstream replacement is available."
 owner = "Mavi security maintainers"
-expires = "2026-10-11"
+expires = "2027-01-20"
 
 [[exception]]
 id = "RUSTSEC-2024-0415"
 scope = "Linux GUI dependency via Tauri GTK3"
 reason = "GTK3 is transitive from Tauri; no compatible upstream replacement is available."
 owner = "Mavi security maintainers"
-expires = "2026-10-11"
+expires = "2027-01-20"
 
 [[exception]]
 id = "RUSTSEC-2024-0420"
 scope = "Linux GUI dependency via Tauri GTK3"
 reason = "GTK3 is transitive from Tauri; no compatible upstream replacement is available."
 owner = "Mavi security maintainers"
-expires = "2026-10-11"
+expires = "2027-01-20"
 
 [[exception]]
 id = "RUSTSEC-2024-0419"
 scope = "Linux GUI dependency via Tauri GTK3"
 reason = "GTK3 is transitive from Tauri; no compatible upstream replacement is available."
 owner = "Mavi security maintainers"
-expires = "2026-10-11"
+expires = "2027-01-20"
 
 [[exception]]
 id = "RUSTSEC-2024-0429"
 scope = "Linux GUI dependency via Tauri glib 0.18"
 reason = "Tauri requires glib 0.18; Mavi VPN does not use the affected VariantStrIter API."
 owner = "Mavi security maintainers"
-expires = "2026-10-11"
+expires = "2027-01-20"
+
 
 [[exception]]
-id = "RUSTSEC-2026-0194"
-scope = "GUI dependency via Tauri plist and quick-xml 0.38"
-reason = "The compatible plist release still requires quick-xml below the advisory fix."
+id = "RUSTSEC-2026-0370"
+scope = "Linux credential storage via keyring 4.2, zbus-secret-service-keyring-store 1.0.1 and zbus 5"
+reason = "zvariant moved into zbus 6; the current keyring backend and secret-service 5.2 still require zbus 5. This is a maintenance advisory, not a reported vulnerability."
 owner = "Mavi security maintainers"
-expires = "2026-10-11"
+expires = "2027-01-20"
 
 [[exception]]
-id = "RUSTSEC-2026-0195"
-scope = "GUI dependency via Tauri plist and quick-xml 0.38"
-reason = "The compatible plist release still requires quick-xml below the advisory fix."
+id = "RUSTSEC-2026-0371"
+scope = "Linux credential storage via keyring 4.2, zbus-secret-service-keyring-store 1.0.1 and zbus 5"
+reason = "zbus_names moved into zbus 6; the current keyring backend and secret-service 5.2 still require zbus 5. This is a maintenance advisory, not a reported vulnerability."
 owner = "Mavi security maintainers"
-expires = "2026-10-11"
+expires = "2027-01-20"
+
+[[exception]]
+id = "RUSTSEC-2026-0372"
+scope = "Linux credential storage via keyring 4.2, zbus-secret-service-keyring-store 1.0.1 and zbus 5"
+reason = "zvariant_derive moved into zbus 6; the current keyring backend and secret-service 5.2 still require zbus 5. This is a maintenance advisory, not a reported vulnerability."
+owner = "Mavi security maintainers"
+expires = "2027-01-20"

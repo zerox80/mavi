@@ -12,7 +12,7 @@ members = [
 [workspace.package]
 version = "1.1.0"
 # Minimum supported Rust version for the whole workspace. Bounded by the
-# locked dependency set (constant_time_eq 0.5 requires 1.95); bump it here
+# locked dependency set (constant_time_eq requires 1.95); bump it here
 # when a dependency raises the floor so older toolchains fail with a clear
 # "package requires rustc X" error instead of an opaque build failure.
 rust-version = "1.95"
@@ -26,7 +26,7 @@ all = "warn"
 
 [workspace.dependencies]
 shared = { path = "shared" }
-tokio = { version = "1.0", features = ["full"] }
+tokio = { version = "1.53.3", features = ["full"] }
 quinn = { version = "=0.12.0", default-features = false, features = ["rustls", "runtime-tokio", "ring"] }
 rustls = { version = "0.23.45", default-features = false, features = ["aws-lc-rs", "std"] }
 anyhow = "1.0"
@@ -35,7 +35,6 @@ socket2 = { version = "0.6", features = ["all"] }
 serde = { version = "1.0", features = ["derive"] }
 bincode = { package = "bincode-next", version = "3.0.0-rc.2", features = ["serde"] }
 tracing = "0.1"
-time = "=0.3.36"
 rcgen = { version = "0.14", default-features = false, features = ["aws_lc_rs", "pem"] }
 rustls-pki-types = "1.10"
 ipnetwork = "0.21"
@@ -67,7 +66,6 @@ quinn-udp = { git = "https://github.com/zerox80/quinn", branch = "main" }
 h3 = { git = "https://github.com/zerox80/h3", branch = "main" }
 h3-quinn = { git = "https://github.com/zerox80/h3", branch = "main" }
 h3-datagram = { git = "https://github.com/zerox80/h3", branch = "main" }
-time = { git = "https://github.com/time-rs/time", rev = "3c3c546a661ac59e1a586a4edc65adff04fd1335" }
 
 [profile.release]
 lto = true

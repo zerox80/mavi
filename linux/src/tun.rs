@@ -110,7 +110,11 @@ impl TunDevice {
 
     /// Wraps the TUN fd in tokio's `AsyncFd` for async read/write.
     pub fn into_async(self) -> Result<AsyncTun> {
-        let async_fd = AsyncFd::new(self).context("Failed to register TUN fd with tokio epoll")?;
+        // SAFETY: TunDevice owns its nonblocking fd and never replaces or closes
+        // it while AsyncFd owns the device.
+        let async_fd = unsafe { AsyncFd::register(self) }
+            .map_err(|error| error.into_parts().1)
+            .context("Failed to register TUN fd with tokio epoll")?;
         Ok(AsyncTun { inner: async_fd })
     }
 }

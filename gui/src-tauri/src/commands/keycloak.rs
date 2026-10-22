@@ -4,8 +4,9 @@ use crate::secret_store::{
     connection_refresh_token_account, keycloak_base_url, keycloak_credential_id,
     KeyringSecretStore, SecretStore,
 };
-use shared::ipc::IpcResponse;
-use shared::ipc::{Config, IpcRequest};
+use shared::ipc::Config;
+#[cfg(not(target_os = "windows"))]
+use shared::ipc::{IpcRequest, IpcResponse};
 use shared::kc_oauth::{self, RefreshOutcome};
 use std::time::Duration;
 use tauri::async_runtime::JoinHandle;

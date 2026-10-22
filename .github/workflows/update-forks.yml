@@ -42,7 +42,7 @@ jobs:
           python3 scripts/check_fork_sources.py --print-lock-revisions \
             > "$RUNNER_TEMP/fork-revisions-before"
       - name: Install Rust stable
-        uses: dtolnay/rust-toolchain@6c977a6ca4077a0ceb28ffbe03f59d46e9ac8772 # stable
+        uses: dtolnay/rust-toolchain@e2a55d2ffb04f378e9626c28d38b36d230d1e12f # stable
         with:
           toolchain: stable
       - name: Cache cargo registry
@@ -101,12 +101,12 @@ jobs:
           ref: ${{ needs.prepare.outputs.base_sha }}
           submodules: recursive
       - name: Download refreshed lockfile
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: refreshed-fork-lockfile
           path: .
       - name: Install Rust stable
-        uses: dtolnay/rust-toolchain@6c977a6ca4077a0ceb28ffbe03f59d46e9ac8772 # stable
+        uses: dtolnay/rust-toolchain@e2a55d2ffb04f378e9626c28d38b36d230d1e12f # stable
         with:
           toolchain: stable
       - name: Cache cargo registry
@@ -141,12 +141,12 @@ jobs:
           ref: ${{ needs.prepare.outputs.base_sha }}
           submodules: recursive
       - name: Download refreshed lockfile
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: refreshed-fork-lockfile
           path: .
       - name: Install Rust stable
-        uses: dtolnay/rust-toolchain@6c977a6ca4077a0ceb28ffbe03f59d46e9ac8772 # stable
+        uses: dtolnay/rust-toolchain@e2a55d2ffb04f378e9626c28d38b36d230d1e12f # stable
         with:
           toolchain: stable
       - name: Cache cargo registry
@@ -191,7 +191,7 @@ jobs:
             exit 1
           fi
       - name: Download verified lockfile
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: refreshed-fork-lockfile
           path: .
