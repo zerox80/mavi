@@ -38,6 +38,7 @@ class MaviVpnService : VpnService() {
     private lateinit var notificationHelper: NotificationHelper
     private lateinit var tokenManager: KeycloakTokenManager
     private lateinit var pauseScheduler: VpnPauseScheduler
+    private lateinit var pauseRecovery: VpnPauseRecovery
 
     companion object {
         private val connectionStatus = VpnConnectionStatus()
@@ -51,6 +52,7 @@ class MaviVpnService : VpnService() {
         notificationHelper = NotificationHelper(this)
         tokenManager = KeycloakTokenManager(PrefsKeycloakTokenStore(prefs))
         pauseScheduler = VpnPauseScheduler(this, ::resumeVpn)
+        pauseRecovery = VpnPauseRecovery(getSharedPreferences("MaviVPN", Context.MODE_PRIVATE))
     }
 
     override fun onStartCommand(
@@ -95,8 +97,8 @@ class MaviVpnService : VpnService() {
         return true
     }
 
-    /** Tears the tunnel down but keeps the service in the foreground until the
-     *  pause runs out, so traffic is never left unprotected indefinitely. */
+    /** Tears the tunnel down but keeps the service in the foreground while
+     *  waiting for automatic resume. Android may delay the wakeup alarm. */
     private fun pauseVpn(minutes: Int) {
         val durationMillis = pauseDurationMillis(minutes)
         if (durationMillis == null) {
@@ -107,6 +109,12 @@ class MaviVpnService : VpnService() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && isLockdownEnabled) {
             // With "Block connections without VPN" a pause would only cut the device off.
             Toast.makeText(this, "Pause is unavailable while Android blocks connections without VPN.", Toast.LENGTH_LONG).show()
+            return
+        }
+
+        if (!pauseRecovery.markPaused()) {
+            Log.e("MaviVPN", "Cannot pause: failed to persist resume state.")
+            Toast.makeText(this, "Could not save VPN pause. Please try again.", Toast.LENGTH_LONG).show()
             return
         }
 
@@ -122,7 +130,7 @@ class MaviVpnService : VpnService() {
     }
 
     private fun resumeVpn() {
-        if (connectionStatus.state.value != VpnConnectionState.PAUSED) return
+        if (!pauseRecovery.canResume(connectionStatus.state.value)) return
         Log.i("MaviVPN", "Resuming paused VPN")
         if (!startVpnIfConfigured(savedVpnStartRequest(prefs))) {
             stopVpn()
@@ -145,6 +153,7 @@ class MaviVpnService : VpnService() {
         isRunning = true
         connectionStatus.start()
         showForegroundNotification(notification)
+        clearPendingPause()
 
         val callbacks =
             VpnSessionCallbacks(
@@ -215,8 +224,15 @@ class MaviVpnService : VpnService() {
     }
 
     private fun stopVpn() {
+        clearPendingPause()
         tearDownVpnSession()
         stopSelf()
+    }
+
+    private fun clearPendingPause() {
+        if (!pauseRecovery.clear()) {
+            Log.w("MaviVPN", "Failed to clear persisted pause state")
+        }
     }
 
     private fun tearDownVpnSession() {

@@ -97,7 +97,8 @@ fun HomeView(
     val statusDetail = when {
         isConnected -> "tunnel active"
         isConnecting -> "connecting…"
-        isPaused -> "resumes in ${formatPauseRemaining(pauseRemaining)}"
+        isPaused && pauseRemaining == 0L -> "waiting to resume"
+        isPaused -> "resume planned in ${formatPauseRemaining(pauseRemaining)}"
         else -> "ready"
     }
     val isDark = androidx.compose.foundation.isSystemInDarkTheme()
@@ -227,6 +228,7 @@ fun HomeView(
             PauseOptions(onPause = onPause)
         } else if (isPaused) {
             Spacer(modifier = Modifier.height(8.dp))
+            Text("Android may delay automatic resume.", fontSize = 12.sp, color = T.mute)
             TextButton(onClick = onDisconnect) {
                 Text("Disconnect", fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = T.ink2)
             }

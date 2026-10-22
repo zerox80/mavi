@@ -10,7 +10,6 @@ import android.os.Looper
 import android.os.SystemClock
 
 private const val RESUME_ALARM_REQUEST_CODE = 2
-private const val RESUME_ALARM_WINDOW_MILLIS = 60_000L
 
 /**
  * Brings a paused tunnel back. The main-thread timer is precise while the
@@ -41,12 +40,16 @@ internal class VpnPauseScheduler(
         val alarms = alarmManager ?: return
         val triggerAt = SystemClock.elapsedRealtime() + durationMillis
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S || alarms.canScheduleExactAlarms()) {
-            alarms.setExactAndAllowWhileIdle(AlarmManager.ELAPSED_REALTIME_WAKEUP, triggerAt, resumeIntent)
-        } else {
-            // Without the exact-alarm grant the system may stretch this window;
-            // the handler above still resumes on time while the screen is on.
-            alarms.setWindow(AlarmManager.ELAPSED_REALTIME_WAKEUP, triggerAt, RESUME_ALARM_WINDOW_MILLIS, resumeIntent)
+            try {
+                alarms.setExactAndAllowWhileIdle(AlarmManager.ELAPSED_REALTIME_WAKEUP, triggerAt, resumeIntent)
+                return
+            } catch (_: SecurityException) {
+                // The exact-alarm grant may be revoked between checking and scheduling.
+            }
         }
+        // Unlike setWindow, this alarm can run during Doze. Android may still
+        // batch or throttle it, so the displayed resume time is only a target.
+        alarms.setAndAllowWhileIdle(AlarmManager.ELAPSED_REALTIME_WAKEUP, triggerAt, resumeIntent)
     }
 
     fun cancel() {

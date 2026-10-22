@@ -45,7 +45,12 @@ class NotificationHelper(private val context: Context) {
         val resumeTime = DateFormat.getTimeFormat(context).format(Date(resumeAtMillis))
         return builder()
             .setContentTitle("Mavi VPN paused")
-            .setContentText("Traffic is not protected. Resumes automatically at $resumeTime.")
+            .setContentText("Traffic is not protected. Resume planned for $resumeTime; Android may delay it.")
+            .setStyle(
+                Notification.BigTextStyle().bigText(
+                    "Traffic is not protected. Resume planned for $resumeTime; Android may delay it.",
+                ),
+            )
             .setSmallIcon(android.R.drawable.ic_media_pause)
             .setWhen(resumeAtMillis)
             .setShowWhen(true)
