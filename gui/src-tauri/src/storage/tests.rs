@@ -1,6 +1,8 @@
 use super::*;
 use crate::secret_store::tests::MemorySecretStore;
 
+mod persistence;
+
 fn test_config() -> Config {
     Config {
         endpoint: "vpn.example.com:443".to_string(),
@@ -256,8 +258,19 @@ fn unwritable_prefs_directory_keeps_the_saved_profile_and_psk() {
     save_prefs_to_dir_with_store(dir.path(), &mut prefs, &store).unwrap();
     prefs.connections.clear();
     std::fs::set_permissions(dir.path(), std::fs::Permissions::from_mode(0o500)).unwrap();
+    // Root or CAP_DAC_OVERRIDE may bypass the directory mode. Verify that this
+    // environment enforces it before expecting the real save to fail.
+    let probe = std::fs::File::create(dir.path().join("write-permission-probe"));
+    if probe.is_ok() {
+        std::fs::set_permissions(dir.path(), std::fs::Permissions::from_mode(0o700)).unwrap();
+        return;
+    }
     let result = save_prefs_to_dir_with_store(dir.path(), &mut prefs, &store);
     std::fs::set_permissions(dir.path(), std::fs::Permissions::from_mode(0o700)).unwrap();
+    assert_eq!(
+        probe.unwrap_err().kind(),
+        std::io::ErrorKind::PermissionDenied
+    );
     assert!(result.is_err());
     let reloaded = load_prefs_from_dir_with_store(dir.path(), &store).unwrap();
     assert_eq!(reloaded.connections[0].token.as_deref(), Some("saved-psk"));
