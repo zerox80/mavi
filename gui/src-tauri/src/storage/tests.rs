@@ -1,6 +1,8 @@
 use super::*;
 use crate::secret_store::tests::MemorySecretStore;
 
+mod persistence;
+
 fn test_config() -> Config {
     Config {
         endpoint: "vpn.example.com:443".to_string(),
@@ -183,6 +185,95 @@ fn save_prefs_deletes_removed_connection_secret() {
     assert!(store
         .deleted()
         .contains(&connection_refresh_token_account("one")));
+}
+
+#[test]
+fn failed_profile_deletion_preserves_credentials_for_the_unchanged_file() {
+    let dir = tempfile::tempdir().unwrap();
+    let store = MemorySecretStore::default();
+    let mut prefs = Prefs {
+        connections: vec![SavedConn {
+            id: "never-connected".into(),
+            token: Some("saved-psk".into()),
+            ..SavedConn::default()
+        }],
+        ..Prefs::default()
+    };
+    save_prefs_to_dir_with_store(dir.path(), &mut prefs, &store).unwrap();
+    let original_file = std::fs::read(dir.path().join("prefs.json")).unwrap();
+    prefs.connections.clear();
+    let result = save_prefs_with_writer(dir.path(), &mut prefs, &store, |_, _| {
+        Err("Permission denied".into())
+    });
+    assert!(result.is_err());
+    assert_eq!(
+        std::fs::read(dir.path().join("prefs.json")).unwrap(),
+        original_file
+    );
+    let reloaded = load_prefs_from_dir_with_store(dir.path(), &store).unwrap();
+    assert_eq!(reloaded.connections[0].token.as_deref(), Some("saved-psk"));
+    assert!(store.deleted().is_empty());
+}
+
+#[test]
+fn failed_authority_change_keeps_the_previous_refresh_credential() {
+    let dir = tempfile::tempdir().unwrap();
+    let store = MemorySecretStore::default();
+    let mut prefs = Prefs {
+        connections: vec![SavedConn {
+            id: "one".into(),
+            kc_auth: Some(true),
+            kc_url: Some("https://auth.example.com".into()),
+            ..SavedConn::default()
+        }],
+        ..Prefs::default()
+    };
+    save_prefs_to_dir_with_store(dir.path(), &mut prefs, &store).unwrap();
+    let account = prefs.connections[0].refresh_account().unwrap();
+    store.set_secret(&account, "saved-refresh").unwrap();
+    prefs.connections[0].kc_realm = Some("new-realm".into());
+    assert!(
+        save_prefs_with_writer(dir.path(), &mut prefs, &store, |_, _| Err(
+            "Disk full".into()
+        ))
+        .is_err()
+    );
+    assert_eq!(store.secret(&account).as_deref(), Some("saved-refresh"));
+}
+
+#[cfg(unix)]
+#[test]
+fn unwritable_prefs_directory_keeps_the_saved_profile_and_psk() {
+    use std::os::unix::fs::PermissionsExt;
+    let dir = tempfile::tempdir().unwrap();
+    let store = MemorySecretStore::default();
+    let mut prefs = Prefs {
+        connections: vec![SavedConn {
+            id: "one".into(),
+            token: Some("saved-psk".into()),
+            ..SavedConn::default()
+        }],
+        ..Prefs::default()
+    };
+    save_prefs_to_dir_with_store(dir.path(), &mut prefs, &store).unwrap();
+    prefs.connections.clear();
+    std::fs::set_permissions(dir.path(), std::fs::Permissions::from_mode(0o500)).unwrap();
+    // Root or CAP_DAC_OVERRIDE may bypass the directory mode. Verify that this
+    // environment enforces it before expecting the real save to fail.
+    let probe = std::fs::File::create(dir.path().join("write-permission-probe"));
+    if probe.is_ok() {
+        std::fs::set_permissions(dir.path(), std::fs::Permissions::from_mode(0o700)).unwrap();
+        return;
+    }
+    let result = save_prefs_to_dir_with_store(dir.path(), &mut prefs, &store);
+    std::fs::set_permissions(dir.path(), std::fs::Permissions::from_mode(0o700)).unwrap();
+    assert_eq!(
+        probe.unwrap_err().kind(),
+        std::io::ErrorKind::PermissionDenied
+    );
+    assert!(result.is_err());
+    let reloaded = load_prefs_from_dir_with_store(dir.path(), &store).unwrap();
+    assert_eq!(reloaded.connections[0].token.as_deref(), Some("saved-psk"));
 }
 
 #[test]
