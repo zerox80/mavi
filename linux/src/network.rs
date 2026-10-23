@@ -330,6 +330,7 @@ fn prepare_direct_connection_with(
 pub fn cleanup_stale_network_state() -> Result<()> {
     info!("Cleaning stale MaviVPN network state...");
 
+    routes::remove_stale_host_routes(&mut command::ProductionCommandRunner)?;
     cleanup_stale_routes(&mut command::ProductionCommandRunner, "mavi0");
 
     let current = std::fs::read(dns::RESOLV_CONF_PATH).ok();
@@ -376,3 +377,7 @@ mod kernel_tests;
 #[cfg(test)]
 #[path = "network/startup_tests.rs"]
 mod startup_tests;
+
+#[cfg(test)]
+#[path = "network/host_route_recovery_tests.rs"]
+mod host_route_recovery_tests;

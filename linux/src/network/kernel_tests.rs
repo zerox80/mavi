@@ -4,7 +4,7 @@ use super::command::{CommandRunner, ProductionCommandRunner};
 use super::{cleanup_stale_routes, ipv6_block, legacy_ipv6, routes};
 use std::process::Command;
 
-fn in_namespace(test: &str) -> bool {
+pub(super) fn in_namespace(test: &str) -> bool {
     const CHILD: &str = "MAVI_ROUTE_TEST_NAMESPACE";
     if std::env::var_os(CHILD).is_none() {
         let available = Command::new("unshare").args(["-Urn", "true"]).output();

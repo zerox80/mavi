@@ -55,7 +55,9 @@ fn interface_and_routes_build_ipv4_route_exception() {
             "via",
             "192.0.2.1",
             "dev",
-            "eth0"
+            "eth0",
+            "proto",
+            "243"
         ]));
     assert!(runner.calls.iter().any(|(_, args)| args
         == &[
@@ -148,7 +150,9 @@ fn interface_and_routes_build_ipv6_address_and_exception() {
             "via",
             "fe80::1",
             "dev",
-            "eth0"
+            "eth0",
+            "proto",
+            "243"
         ]));
     assert!(
         runner
