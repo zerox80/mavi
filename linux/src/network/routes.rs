@@ -154,6 +154,25 @@ fn host_route_args(
 
 pub(super) fn remove_stale_host_routes(runner: &mut impl CommandRunner) -> Result<()> {
     for family in ["-4", "-6"] {
+        // Unlike `flush`, `show` succeeds with an empty result when the main
+        // table does not exist (for example, IPv4 in an IPv6-only namespace).
+        let routes = runner
+            .output(
+                "ip",
+                &[
+                    family,
+                    "route",
+                    "show",
+                    "table",
+                    "main",
+                    "proto",
+                    HOST_ROUTE_PROTOCOL,
+                ],
+            )
+            .context("Could not inspect stale Mavi host route exceptions")?;
+        if routes.trim().is_empty() {
+            continue;
+        }
         runner
             .run(
                 "ip",
