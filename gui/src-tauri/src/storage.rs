@@ -6,6 +6,12 @@ use serde::Deserialize;
 use shared::ipc::Config;
 use std::path::Path;
 
+mod credential_cleanup;
+use credential_cleanup::StoredPrefs;
+
+// Keep profile commits and cleanup checkpoints from overlapping in IPC calls.
+static PREFS_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
 #[derive(serde::Serialize, serde::Deserialize, Clone, Default)]
 struct SavedConn {
     id: String,
@@ -190,6 +196,7 @@ fn load_config_from_dir_with_store(
 }
 
 pub(crate) fn load_prefs_from_dir(config_dir: &Path) -> Result<Prefs, String> {
+    let _guard = PREFS_LOCK.lock().map_err(|e| e.to_string())?;
     load_prefs_from_dir_with_store(config_dir, &KeyringSecretStore)
 }
 
@@ -201,8 +208,12 @@ fn load_prefs_from_dir_with_store(
     if !prefs_path.exists() {
         return Ok(Prefs::default());
     }
-    let content = std::fs::read_to_string(prefs_path).map_err(|e| e.to_string())?;
-    let mut prefs: Prefs = serde_json::from_str(&content).map_err(|e| e.to_string())?;
+    let content = std::fs::read_to_string(&prefs_path).map_err(|e| e.to_string())?;
+    let mut stored: StoredPrefs = serde_json::from_str(&content).map_err(|e| e.to_string())?;
+    stored.cleanup(&prefs_path, store, &mut |path, content| {
+        write_prefs_atomically(path, content).map_err(|e| e.to_string())
+    });
+    let mut prefs = stored.prefs;
     prefs.normalize_transport();
     let mut migrated_plaintext = false;
     for conn in &mut prefs.connections {
@@ -222,6 +233,7 @@ fn load_prefs_from_dir_with_store(
 }
 
 pub(crate) fn save_prefs_to_dir(config_dir: &Path, prefs: &mut Prefs) -> Result<(), String> {
+    let _guard = PREFS_LOCK.lock().map_err(|e| e.to_string())?;
     save_prefs_to_dir_with_store(config_dir, prefs, &KeyringSecretStore)
 }
 
@@ -230,25 +242,63 @@ fn save_prefs_to_dir_with_store(
     prefs: &mut Prefs,
     store: &dyn SecretStore,
 ) -> Result<(), String> {
+    save_prefs_with_writer(config_dir, prefs, store, |path, content| {
+        write_prefs_atomically(path, content).map_err(|e| e.to_string())
+    })
+}
+
+fn write_prefs_atomically(path: &Path, content: &str) -> std::io::Result<()> {
+    use std::io::Write;
+    #[cfg(unix)]
+    let permissions = match std::fs::metadata(path) {
+        Ok(metadata) => Some(metadata.permissions()),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => None,
+        Err(error) => return Err(error),
+    };
+    let temporary = path.with_extension(format!("{}.tmp", rand::random::<u64>()));
+    let mut options = std::fs::OpenOptions::new();
+    options.write(true).create_new(true);
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::OpenOptionsExt;
+        options.mode(0o600);
+    }
+    let mut file = options.open(&temporary)?;
+    let result = (|| {
+        #[cfg(unix)]
+        if let Some(permissions) = permissions {
+            file.set_permissions(permissions)?;
+        }
+        file.write_all(content.as_bytes())?;
+        file.sync_all()?;
+        drop(file);
+        std::fs::rename(&temporary, path)
+    })();
+    if result.is_err() {
+        let _ = std::fs::remove_file(&temporary);
+    }
+    result
+}
+
+fn save_prefs_with_writer(
+    config_dir: &Path,
+    prefs: &mut Prefs,
+    store: &dyn SecretStore,
+    mut write: impl FnMut(&Path, &str) -> Result<(), String>,
+) -> Result<(), String> {
     std::fs::create_dir_all(config_dir).map_err(|e| e.to_string())?;
     let prefs_path = config_dir.join("prefs.json");
     let previous = if prefs_path.exists() {
         std::fs::read_to_string(&prefs_path)
             .ok()
-            .and_then(|content| serde_json::from_str::<Prefs>(&content).ok())
+            .and_then(|content| serde_json::from_str::<StoredPrefs>(&content).ok())
             .unwrap_or_default()
     } else {
-        Prefs::default()
+        StoredPrefs::default()
     };
 
     prefs.normalize_transport();
     let mut redacted = prefs.clone();
-    let current_ids = redacted
-        .connections
-        .iter()
-        .map(|conn| conn.id.clone())
-        .collect::<std::collections::HashSet<_>>();
-
     for conn in &mut redacted.connections {
         if let Some(token) = conn.token.as_deref().filter(|t| !t.is_empty()) {
             store.set_secret(&connection_token_account(&conn.id), token)?;
@@ -256,21 +306,13 @@ fn save_prefs_to_dir_with_store(
         conn.token = None;
     }
 
-    for old in previous.connections {
-        if let Some(account) = old.refresh_account() {
-            let current = redacted.connections.iter().find(|conn| conn.id == old.id);
-            if current.and_then(SavedConn::refresh_account).as_ref() != Some(&account) {
-                store.delete_secret(&account)?;
-            }
-        }
-        if !current_ids.contains(&old.id) {
-            store.delete_secret(&connection_token_account(&old.id))?;
-            store.delete_secret(&connection_refresh_token_account(&old.id))?;
-        }
-    }
+    // Commit profiles and pending deletions together before touching old secrets.
+    // A failed write leaves the old profiles usable; failed deletions survive restarts.
+    let mut stored = StoredPrefs::for_save(redacted, previous);
+    let content = serde_json::to_string_pretty(&stored).map_err(|e| e.to_string())?;
+    write(&prefs_path, &content)?;
+    stored.cleanup(&prefs_path, store, &mut write);
 
-    let content = serde_json::to_string_pretty(&redacted).map_err(|e| e.to_string())?;
-    std::fs::write(&prefs_path, content).map_err(|e| e.to_string())?;
     Ok(())
 }
 
