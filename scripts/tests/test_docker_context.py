@@ -22,20 +22,34 @@ class DockerContextTests(unittest.TestCase):
             ready = subprocess.run(command + ["info"], capture_output=True, text=True)
             if ready.returncode:
                 self.skipTest("Container engine unavailable: " + ready.stderr.strip())
-            for context in [".", "backend"]:
+            contexts = [
+                ("root", ROOT / ".dockerignore"),
+                ("backend", ROOT / "backend/.dockerignore"),
+                ("server", ROOT / "docker/server/Dockerfile.dockerignore"),
+            ]
+            for context, ignore in contexts:
                 with self.subTest(context=context):
-                    source = root / ("root" if context == "." else "backend")
+                    source = root / context
                     source.mkdir()
-                    shutil.copyfile(ROOT / context / ".dockerignore", source / ".dockerignore")
+                    shutil.copyfile(ignore, source / ".dockerignore")
                     excluded = [".env", ".env.production", "auth_token.txt", "mavi-vpn.json", ".git/config", "data/private.pem", "letsencrypt/account.key", "backend/data/tls.key", "backend/letsencrypt/privkey.pem", "target/debug/cache", "node_modules/cache", "src/secret.key", "backend/src/secret.key"]
-                    included = ["Cargo.toml", "backend/Cargo.toml", "shared/src/lib.rs", "backend/src/main.rs", "backend/entrypoint.sh"] if context == "." else ["Cargo.toml", "src/main.rs", "entrypoint.sh"]
+                    excluded += ["docker/server/data/private.pem", "docker/server/.env", "Android-docker-build/output/apk/debug/app-debug.apk"]
+                    included = ["Cargo.toml", "backend/Cargo.toml", "shared/src/lib.rs", "backend/src/main.rs", "backend/entrypoint.sh"] if context != "backend" else ["Cargo.toml", "src/main.rs", "entrypoint.sh"]
+                    if context == "server":
+                        included.append("LICENSE")
                     for name in excluded + included:
                         path = source / name
                         path.parent.mkdir(parents=True, exist_ok=True)
                         path.write_text("harmless sentinel\n")
                     recipe = root / "Containerfile"
+                    if context == "server":
+                        recipe = source / "docker/server/Dockerfile"
+                        recipe.parent.mkdir(parents=True, exist_ok=True)
+                        shutil.copyfile(ignore, recipe.with_name("Dockerfile.dockerignore"))
+                        # Prove Docker uses the recipe-specific ignore rules.
+                        (source / ".dockerignore").write_text("**\n")
                     recipe.write_text("FROM scratch\nCOPY . /context/\n")
-                    output = root / ("out-root" if context == "." else "out-backend")
+                    output = root / ("out-" + context)
                     result = subprocess.run(command + ["build", "--network=none", "--output", f"type=local,dest={output}", "-f", str(recipe), str(source)], capture_output=True, text=True, env={**os.environ, "DOCKER_BUILDKIT": "1"})
                     self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
                     for name in excluded:

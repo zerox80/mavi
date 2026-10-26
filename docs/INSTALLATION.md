@@ -8,6 +8,10 @@ This guide describes how to deploy the Mavi VPN server and connect clients. The 
 
 The backend is fully dockerized for Linux servers.
 
+For the prebuilt server image and a minimal Compose deployment, use
+[`docker/server/`](../docker/server/README.md). The steps below build the server
+locally and also cover the optional Keycloak/Traefik stack.
+
 ### Prerequisites
 * **Docker** and **Docker Compose** installed.
 * Ports open in your firewall:
@@ -338,13 +342,12 @@ or full token exchange responses. Redact logs before sharing.
 The Android client is built as a native Kotlin app with a bundled Rust core for the VPN logic.
 
 ### Prerequisites
-* **Android Studio** (Koala or newer).
-* **Android SDK 36** (target).
-* **Rust** with `cargo-ndk` installed:
-  ```bash
-  cargo install cargo-ndk
-  rustup target add aarch64-linux-android armv7-linux-androideabi i686-linux-android x86_64-linux-android
-  ```
+* **WSL 2** on Windows, with a Linux distribution such as Ubuntu.
+* **Docker** with Compose and a running Linux engine. Enable Docker Desktop's
+  WSL integration, or install Docker Engine and Compose in WSL.
+* Internet access for SDK/Rust dependencies and the current fork commits.
+
+Java, Android SDK/NDK, Rust and cargo-ndk are installed inside the Docker image.
 
 ### Step-by-Step Guide
 
@@ -352,9 +355,14 @@ The Android client is built as a native Kotlin app with a bundled Rust core for 
 Ensure your Keycloak client is configured with `com.mavi.vpn://oauth/callback` for debug builds. Release builds must use a verified HTTPS App Link; build with `-Pmavi.oauthRedirectUri=https://<verified-domain>/<callback-path>` and register that exact URI in Keycloak.
 
 **2. Build the App:**
-1. Open the `/android` folder in Android Studio.
-2. The project will automatically sync and build the Rust core (via `cargoBuild` task in `build.gradle.kts`).
-3. Build the APK via **Build -> Build Bundle(s) / APK(s) -> Build APK(s)**.
+1. From PowerShell in the repository root, run `.\Android-docker-build\build.ps1`.
+   This invokes Docker through WSL. In WSL/Linux, run `bash Android-docker-build/build.sh`.
+2. The container updates and verifies the h2/h3/Quinn forks and builds the app
+   with the native Rust libraries for all four architectures.
+3. Install `Android-docker-build/output/apk/debug/app-debug.apk`.
+
+See [Android Docker build](../Android-docker-build/README.md) for release builds,
+tests and cache management.
 
 **3. Run and Login:**
 1. Install the APK on your Android device.

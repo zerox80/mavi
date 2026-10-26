@@ -133,6 +133,7 @@ val cargoBuild =
             "../jniLibs",
             "build",
             "--release",
+            "--locked",
         )
     }
 

@@ -34,7 +34,7 @@ Clients are available for **Windows**, **Linux**, and **Android**, with a
 or an existing Keycloak server.
 
 For a server without a local Rust build, start with
-**[mavi-vpn-docker](https://github.com/zerox80/mavi-vpn-docker)**: prebuilt Linux
+**[docker/server](docker/server/README.md)**: prebuilt Linux
 AMD64 and ARM64 images with Docker Compose. Client downloads are on the
 [releases page](https://github.com/zerox80/mavi-vpn/releases). Check the Assets
 section for your chosen version; if a platform archive is not attached yet,
@@ -66,19 +66,19 @@ use the source build instructions below.
 
 ### Server Deployment (Prebuilt Docker Images)
 
-Use [mavi-vpn-docker](https://github.com/zerox80/mavi-vpn-docker#installation)
+Use [docker/server](docker/server/README.md#installation)
 for the Compose file and setup steps. It runs the VPN server on Linux AMD64 or
 ARM64 without installing Rust or compiling on the host. You need Docker Compose,
 `/dev/net/tun`, host IP forwarding, and the configured port open in both host and
 provider firewalls. The setup guide covers these requirements and client pairing.
 
-The Docker repository defaults to IPv4-only. **The Windows client in 1.0.1 and
-current `main` requires a complete IPv6 tunnel configuration**: follow the Docker
-repository's [IPv6 setup](https://github.com/zerox80/mavi-vpn-docker#enabling-ipv6)
+The server Compose setup defaults to IPv4-only. **The Windows client in 1.0.1 and
+current `main` requires a complete IPv6 tunnel configuration**: follow the server
+setup's [IPv6 instructions](docker/server/README.md#enabling-ipv6)
 and set `VPN_DISABLE_IPV6=false` before connecting those clients.
 
-Images are built from `main`; `latest` is not a versioned release image. See the Docker
-repository's [update and rollback instructions](https://github.com/zerox80/mavi-vpn-docker#updates-and-rollbacks).
+Images are built from `main`; `latest` is not a versioned release image. See the
+[update and rollback instructions](docker/server/README.md#updates-and-rollbacks).
 
 ### Server Deployment (Build from Source)
 
@@ -191,14 +191,21 @@ require reinstalling the app and re-entering its configuration.
 
 To build from source:
 
-1. Install **Rust** targets + `cargo-ndk`:
-   ```bash
-   cargo install cargo-ndk
-   rustup target add aarch64-linux-android armv7-linux-androideabi i686-linux-android x86_64-linux-android
-   ```
-2. Open the `android/` folder in **Android Studio**.
-3. Build the APK; Gradle compiles the Rust core automatically. From `android/`,
-   `./gradlew assembleDebug` runs the same debug build used in CI.
+Android builds run in Docker. On Windows, use **WSL 2** with Docker Desktop's
+WSL integration (or Docker Engine and Compose installed in WSL). From PowerShell
+in the repository root:
+
+```powershell
+.\Android-docker-build\build.ps1
+```
+
+From WSL or Linux, run `bash Android-docker-build/build.sh`. The same build runs
+in CI and includes the Rust core for all four Android architectures. The APK is
+written to `Android-docker-build/output/apk/debug/app-debug.apk`.
+In GitHub Actions, **Build Android APK** runs on pushes and pull requests and
+supports manual runs. Download the `android-apk` artifact from the completed run.
+See [Android Docker build](Android-docker-build/README.md) for tests, release
+builds, WSL distribution selection, caches, and fork updates.
 
 ### Tauri GUI Development
 
@@ -284,6 +291,8 @@ mavi-vpn/
 │   └── app/src/main/
 │       ├── java/             # Kotlin: Jetpack Compose UI, VpnService, NetworkCallback
 │       └── rust/src/lib.rs   # JNI core: QUIC/HTTP2, cert pinning, migration
+├── Android-docker-build/ # Docker build, launched through WSL on Windows
+├── docker/server/      # Prebuilt server deployment and image definition
 │
 ├── gui/                # Cross-platform Tauri v2 GUI (HTML/CSS/JS + Rust)
 │   ├── src/                  # Frontend (vanilla HTML/CSS/JS)
@@ -371,7 +380,7 @@ Full enterprise SSO with Keycloak:
 
 Defaults below are for the server binary unless noted. `VPN_IPV6_WAIT` is a
 Docker entrypoint setting. Compose and `.env` can override these defaults:
-the source Compose setup uses port `10443`, while `mavi-vpn-docker` also defaults
+the source Compose setup uses port `10443`, while `docker/server` also defaults
 to `VPN_DISABLE_IPV6=true`. In the source Compose file, environment variables must
 be listed under the service's `environment` mapping to reach the container.
 
@@ -484,7 +493,7 @@ sudo ip6tables -t nat -S MAVI_VPN6_NAT            # expect: MASQUERADE for fd00:
 
 | Document | Description |
 |---|---|
-| [mavi-vpn-docker](https://github.com/zerox80/mavi-vpn-docker) | Prebuilt server images, Docker Compose setup, updates, and migration |
+| [docker/server](docker/server/README.md) | Prebuilt server images, Docker Compose setup, updates, and migration |
 | [`docs/INSTALLATION.md`](docs/INSTALLATION.md) | Comprehensive installation guide for all platforms |
 | [`docs/NGINX_PROXY.md`](docs/NGINX_PROXY.md) | Deploying behind an existing Nginx with wildcard SSL |
 | [`CODEWIKI.md`](CODEWIKI.md) | Deep technical encyclopedia of the entire codebase |
