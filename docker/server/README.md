@@ -31,8 +31,8 @@ It explains all settings, including the IPv6 switches, directly in the file.
 For IPv6, also complete the [host IPv6 setup](#enabling-ipv6) before starting.
 
 ```bash
-git clone https://github.com/zerox80/mavi-vpn.git
-cd mavi-vpn/docker/server
+git clone https://github.com/zerox80/mavi.git
+cd mavi/docker/server
 cp .env.example .env
 chmod 600 .env
 openssl rand -hex 32
@@ -384,7 +384,7 @@ is documented separately in [`Android-docker-build/`](../../Android-docker-build
 
 When switching publishing to this repository, disable the old repository's
 `Publish VPN image` workflow so both repositories do not overwrite the same
-`latest` tag. In the existing GHCR package settings, grant `zerox80/mavi-vpn`
+`latest` tag. In the existing GHCR package settings, grant `zerox80/mavi`
 Actions access with write permission if it is currently linked only to the
 old repository.
 

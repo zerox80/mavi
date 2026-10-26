@@ -32,7 +32,7 @@ env:
 
 jobs:
   prepare:
-    if: github.repository == 'zerox80/mavi-vpn' && github.ref == 'refs/heads/main'
+    if: github.repository == 'zerox80/mavi' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     outputs:
@@ -110,8 +110,8 @@ jobs:
           labels: |
             org.opencontainers.image.title=Mavi VPN Server
             org.opencontainers.image.description=Prebuilt Mavi VPN server for Docker Compose
-            org.opencontainers.image.source=https://github.com/zerox80/mavi-vpn
-            org.opencontainers.image.url=https://github.com/zerox80/mavi-vpn
+            org.opencontainers.image.source=https://github.com/zerox80/mavi
+            org.opencontainers.image.url=https://github.com/zerox80/mavi
             org.opencontainers.image.revision=${{ needs.prepare.outputs.source_sha }}
             org.opencontainers.image.licenses=MIT
             io.mavi-vpn.deployment.revision=${{ github.sha }}
@@ -167,7 +167,7 @@ jobs:
             "${images[@]}"
           {
             docker buildx imagetools inspect "$IMAGE:$BUILD_TAG"
-            echo "Server source: https://github.com/zerox80/mavi-vpn/commit/$SOURCE_SHA"
+            echo "Server source: https://github.com/zerox80/mavi/commit/$SOURCE_SHA"
             echo "Deployment revision: $GITHUB_SHA"
             echo "Rollback image: $IMAGE:$BUILD_TAG"
           } >> "$GITHUB_STEP_SUMMARY"
