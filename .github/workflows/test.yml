@@ -135,7 +135,7 @@ jobs:
 
           cargo llvm-cov --all-features $ALL_RUST_PACKAGES --lcov --output-path target/coverage/lcov.info
       - name: Upload Rust coverage
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: rust-coverage
           path: target/coverage/lcov.info
@@ -213,7 +213,7 @@ jobs:
           cargo llvm-cov --all-features -p windows-vpn --summary-only
           cargo llvm-cov --all-features -p windows-vpn --lcov --output-path target/coverage/windows-lcov.info
       - name: Upload Windows Rust coverage
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: windows-rust-coverage
           path: target/coverage/windows-lcov.info
@@ -241,7 +241,7 @@ jobs:
       - name: Run frontend coverage
         run: npm run test:coverage
       - name: Upload frontend coverage
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: frontend-coverage
           path: gui/coverage/
@@ -257,7 +257,7 @@ jobs:
         run: bash Android-docker-build/build.sh testDebugUnitTest jacocoDebugUnitTestReport
       - name: Upload Android JVM coverage
         if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: android-jvm-coverage
           path: |
