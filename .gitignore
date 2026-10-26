@@ -22,6 +22,7 @@ android/build/
 android/app/build/
 android/app/src/main/jniLibs/
 android/app/release/
+/Android-docker-build/output/
 local.properties
 *.iml
 *.hprof
@@ -58,6 +59,7 @@ gui/src-tauri/build_error.txt
 
 # --- Backend ---
 /backend/data/
+/docker/server/data/
 /backend/letsencrypt/
 .agents/workflows/gemini.md
 android/gradlew

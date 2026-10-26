@@ -76,66 +76,6 @@ jobs:
             dist/*.rpm
 
 
-  # ── Android APK ──────────────────────────────────────────────────────────────
-  android-apk:
-    name: Android APK
-    runs-on: ubuntu-latest
-    env:
-      NDK_VERSION: 28.1.13356709
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          submodules: recursive
-
-      - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
-        with:
-          distribution: temurin
-          java-version: 17
-
-      - name: Install Android SDK and NDK
-        run: |
-          echo "y" | ${ANDROID_SDK_ROOT}/cmdline-tools/latest/bin/sdkmanager "platforms;android-37.1" "build-tools;37.0.0" "ndk;${NDK_VERSION}" --channel=3
-          echo "ANDROID_NDK_ROOT=${ANDROID_SDK_ROOT}/ndk/${NDK_VERSION}" >> $GITHUB_ENV
-
-      - uses: dtolnay/rust-toolchain@e2a55d2ffb04f378e9626c28d38b36d230d1e12f # stable
-        with:
-          toolchain: stable
-          targets: aarch64-linux-android,armv7-linux-androideabi,i686-linux-android,x86_64-linux-android
-
-      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: |
-            ~/.cargo/registry/index/
-            ~/.cargo/registry/cache/
-            ~/.cargo/git/db/
-            ~/.cargo/bin/cargo-ndk
-            target/
-          key: android-cargo-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: android-cargo-
-
-      - name: Install cargo-ndk
-        run: which cargo-ndk || cargo install cargo-ndk --locked
-
-      - name: Build APK (debug)
-        working-directory: android
-        run: |
-          chmod +x gradlew
-          ./gradlew assembleDebug
-
-      - name: Verify APK contains generated native libraries
-        working-directory: android
-        run: |
-          APK="$(ls app/build/outputs/apk/debug/*.apk | head -n 1)"
-          test -n "$APK"
-          for abi in armeabi-v7a arm64-v8a x86 x86_64; do
-            unzip -l "$APK" | grep -q "lib/${abi}/libmavivpn.so"
-          done
-
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          name: android-apk
-          path: android/app/build/outputs/apk/debug/*.apk
-
   # ── Linux GUI (Tauri) ─────────────────────────────────────────────────────────
   linux-gui:
     name: Linux GUI (Tauri)

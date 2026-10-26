@@ -41,6 +41,19 @@ updates:
       interval: "weekly"
     open-pull-requests-limit: 5
 
+  # Maintain the published server image and Android build toolchain.
+  - package-ecosystem: "docker"
+    directory: "/docker/server"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
+
+  - package-ecosystem: "docker"
+    directory: "/Android-docker-build"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
+
   # Maintain Android dependencies
   - package-ecosystem: "gradle"
     directory: "/android"

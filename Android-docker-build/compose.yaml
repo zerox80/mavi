@@ -1,0 +1,35 @@
+name: mavi-android
+
+services:
+  android:
+    # The Android NDK supplies Linux x86_64 host tools.
+    platform: linux/amd64
+    build:
+      context: .
+    environment:
+      LOCAL_UID: ${LOCAL_UID:-0}
+      LOCAL_GID: ${LOCAL_GID:-0}
+    volumes:
+      - type: bind
+        source: ..
+        target: /source
+        read_only: true
+      # Only the refreshed fork lockfile and build outputs are written to the host.
+      - type: bind
+        source: ../Cargo.lock
+        target: /lock/Cargo.lock
+      - type: bind
+        source: ./output
+        target: /output
+      - gradle:/cache/gradle
+      - cargo-registry:/opt/cargo/registry
+      - cargo-git:/opt/cargo/git
+      - rust-target:/cache/target
+      - android-debug-key:/root/.android
+
+volumes:
+  gradle:
+  cargo-registry:
+  cargo-git:
+  rust-target:
+  android-debug-key:
