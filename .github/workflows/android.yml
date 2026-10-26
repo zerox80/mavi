@@ -17,6 +17,10 @@ jobs:
     name: Android APK
     runs-on: ubuntu-24.04
     timeout-minutes: 60
+    env:
+      MAVI_ANDROID_BUILD_IMAGE: mavi-android-build:ci
+      MAVI_ANDROID_SKIP_IMAGE_BUILD: '1'
+      MAVI_ANDROID_BUILD_CONTEXT: ${{ github.workspace }}/.android-builder
     steps:
       - name: Check out source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -27,7 +31,30 @@ jobs:
       - name: Validate Gradle Wrapper
         uses: gradle/actions/wrapper-validation@3f5f9adaf7d9fecd50b5935e54106014257a94e6 # v6.4.0
 
-      - name: Build and verify debug APK in Docker
+      - name: Check out Android Docker build definition
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: zerox80/mavi-android-build
+          ref: main
+          path: .android-builder
+          persist-credentials: false
+
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4
+
+      - name: Build and load image from mavi-android-build
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7
+        with:
+          context: .android-builder
+          platforms: linux/amd64
+          pull: true
+          load: true
+          push: false
+          tags: mavi-android-build:ci
+          cache-from: type=gha,scope=android-toolchain
+          cache-to: type=gha,scope=android-toolchain,mode=max
+
+      - name: Build and verify APK with the mavi-android-build image
         shell: bash
         run: bash Android-docker-build/build.sh assembleDebug
 

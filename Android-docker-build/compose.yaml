@@ -4,8 +4,9 @@ services:
   android:
     # The Android NDK supplies Linux x86_64 host tools.
     platform: linux/amd64
+    image: ${MAVI_ANDROID_BUILD_IMAGE:-mavi-android-build:local}
     build:
-      context: .
+      context: ${MAVI_ANDROID_BUILD_CONTEXT:-../../mavi-android-build}
     environment:
       LOCAL_UID: ${LOCAL_UID:-0}
       LOCAL_GID: ${LOCAL_GID:-0}

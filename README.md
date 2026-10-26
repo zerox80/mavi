@@ -204,6 +204,9 @@ in CI and includes the Rust core for all four Android architectures. The APK is
 written to `Android-docker-build/output/apk/debug/app-debug.apk`.
 In GitHub Actions, **Build Android APK** runs on pushes and pull requests and
 supports manual runs. Download the `android-apk` artifact from the completed run.
+The workflow checks out the Docker definition from
+[mavi-android-build](https://github.com/zerox80/mavi-android-build), builds the
+toolchain image with Buildx, then uses it to build the APK.
 See [Android Docker build](Android-docker-build/README.md) for tests, release
 builds, WSL distribution selection, caches, and fork updates.
 
