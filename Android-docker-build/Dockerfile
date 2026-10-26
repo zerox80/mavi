@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1
-FROM eclipse-temurin:21-jdk-noble
+FROM eclipse-temurin:25-jdk-noble
 
 ARG ANDROID_COMMAND_LINE_TOOLS=15859902
 # Published at https://developer.android.com/studio#command-line-tools-only
