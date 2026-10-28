@@ -6,7 +6,7 @@ use std::path::{Path, PathBuf};
 
 const CONFIG_FILE: &str = "mavi-vpn.json";
 
-fn default_config_path() -> PathBuf {
+pub(super) fn default_config_path() -> PathBuf {
     if let Ok(xdg) = std::env::var("XDG_CONFIG_HOME") {
         let path = PathBuf::from(xdg).join("mavi-vpn").join(CONFIG_FILE);
         if path.exists() {

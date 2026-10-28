@@ -1,4 +1,5 @@
 mod config;
+mod daemon_credentials;
 mod secrets;
 
 use crate::{daemon, vpn_core};
@@ -52,7 +53,7 @@ pub fn run() {
 
         // --- IPC client commands (talk to running daemon) ---
         "start" => config_path(&args).and_then(run_ipc_start),
-        "stop" => run_ipc_stop(),
+        "stop" => config_path(&args).and_then(run_ipc_stop),
         "repair" => run_repair(&args[1..]),
 
         "status" => {
@@ -196,21 +197,40 @@ fn run_daemon() -> Result<()> {
 fn run_ipc_start(config_path: Option<PathBuf>) -> Result<()> {
     let rt = tokio::runtime::Runtime::new()?;
     rt.block_on(async {
-        let (config, _) = config::load_or_prompt_config(config_path).await?;
+        let config_path = config_path.unwrap_or_else(config::default_config_path);
+        let _credentials = daemon_credentials::lock(&config_path).await?;
+        daemon_credentials::ensure_can_start(
+            daemon::send_request(shared::ipc::IpcRequest::Status).await?,
+        )?;
+        daemon_credentials::sync_refresh_tokens(
+            &config_path,
+            &secrets::KeyringSecretStore,
+            daemon::send_request,
+        )
+        .await?;
+        let (config, config_path) = config::load_or_prompt_config(Some(config_path)).await?;
         handle_action_response(
-            daemon::send_request(shared::ipc::IpcRequest::Start(config)).await,
+            daemon::send_request(daemon_credentials::start_request(config, &config_path)).await,
             "Start accepted. Run status to check tunnel readiness.",
         )
     })
 }
 
-fn run_ipc_stop() -> Result<()> {
+fn run_ipc_stop(config_path: Option<PathBuf>) -> Result<()> {
     let rt = tokio::runtime::Runtime::new()?;
     rt.block_on(async {
         handle_action_response(
             daemon::send_request(shared::ipc::IpcRequest::Stop).await,
             "Stop accepted. Run status to check shutdown progress.",
+        )?;
+        let config_path = config_path.unwrap_or_else(config::default_config_path);
+        let _credentials = daemon_credentials::lock(&config_path).await?;
+        daemon_credentials::sync_refresh_tokens(
+            &config_path,
+            &secrets::KeyringSecretStore,
+            daemon::send_request,
         )
+        .await
     })
 }
 

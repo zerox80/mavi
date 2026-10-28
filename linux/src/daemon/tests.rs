@@ -18,7 +18,7 @@ fn test_state() -> Arc<Mutex<DaemonState>> {
     Arc::new(Mutex::new(DaemonState::new()))
 }
 
-fn test_config() -> Config {
+pub(super) fn test_config() -> Config {
     Config {
         endpoint: "vpn.example.com:443".to_string(),
         token: "token".to_string(),
