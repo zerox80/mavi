@@ -222,7 +222,7 @@ dependencies {
     implementation("androidx.compose.material3:material3")
     implementation("androidx.compose.material:material-icons-extended")
     implementation("androidx.browser:browser:1.10.0")
-    implementation("com.squareup.okhttp3:okhttp:5.5.0") // For token exchange
+    implementation("com.squareup.okhttp3:okhttp:5.5.1") // For token exchange
 
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.robolectric:robolectric:4.17")
