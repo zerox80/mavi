@@ -73,7 +73,8 @@ pub(super) async fn connect_and_handshake_h3(
         .map_err(|e| anyhow::anyhow!("H3 recv_response failed: {}", e))?;
 
     if resp.status() != http::StatusCode::OK {
-        anyhow::bail!("AUTH_FAILED: Server returned HTTP {}", resp.status());
+        // Authentication and temporary capacity failures share this response.
+        anyhow::bail!("Server rejected connection: HTTP {}", resp.status());
     }
     if resp
         .headers()

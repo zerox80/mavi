@@ -2,6 +2,42 @@ use super::*;
 use tokio::io::DuplexStream;
 use tokio::sync::oneshot;
 
+#[tokio::test]
+async fn ambiguous_http_rejection_keeps_reconnect_enabled() {
+    tokio::time::timeout(Duration::from_secs(3), async {
+        let (client, server) = tokio::io::duplex(65536);
+        let peer = tokio::spawn(async move {
+            let mut builder = h2::server::Builder::new();
+            builder.enable_connect_protocol();
+            let mut connection = builder.handshake::<_, Bytes>(server).await.unwrap();
+            let (_request, mut respond) = connection.accept().await.unwrap().unwrap();
+            respond
+                .send_response(
+                    http::Response::builder().status(401).body(()).unwrap(),
+                    true,
+                )
+                .unwrap();
+            let _ = connection.accept().await;
+        });
+        let error = establish_h2(
+            client,
+            "127.0.0.1:443".parse().unwrap(),
+            "valid-token".into(),
+        )
+        .await
+        .err()
+        .expect("capacity rejection must fail the handshake");
+        assert!(error.to_string().contains("401"));
+        assert!(!shared::session_errors::is_permanent_session_error(
+            &error.to_string(),
+            &[]
+        ));
+        peer.await.unwrap();
+    })
+    .await
+    .unwrap();
+}
+
 fn config_capsule() -> Bytes {
     let config = ControlMessage::Config {
         assigned_ip: "10.8.0.2".parse().unwrap(),
