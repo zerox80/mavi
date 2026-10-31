@@ -1,4 +1,45 @@
 use super::*;
+
+#[tokio::test]
+async fn duplicate_start_does_not_load_or_refresh_the_active_workers_credentials() {
+    use crate::ipc::VpnState;
+    for state in [
+        VpnState::Starting,
+        VpnState::Connected,
+        VpnState::Reconnecting,
+        VpnState::Stopping,
+    ] {
+        let response = IpcResponse::Status {
+            running: state == VpnState::Connected,
+            endpoint: None,
+            state,
+            last_error: None,
+            assigned_ip: None,
+        };
+        assert!(prepare_start(response, || async {
+            panic!("an active service owns the saved refresh token");
+        })
+        .await
+        .is_err());
+    }
+}
+
+#[tokio::test]
+async fn stopped_service_allows_preparing_new_credentials() {
+    for state in [crate::ipc::VpnState::Stopped, crate::ipc::VpnState::Failed] {
+        let response = IpcResponse::Status {
+            running: false,
+            endpoint: None,
+            state,
+            last_error: None,
+            assigned_ip: None,
+        };
+        let config = prepare_start(response, || async { Ok(crate::main_tests::test_config()) })
+            .await
+            .unwrap();
+        assert_eq!(config, crate::main_tests::test_config());
+    }
+}
 use crate::client_config::{load_config_from_path, save_config_to_path};
 use crate::ipc::Config;
 use crate::secrets::{config_token_account, tests::MemorySecretStore};

@@ -58,7 +58,11 @@ pub(crate) async fn interactive_mode() -> Result<()> {
 pub(crate) async fn start_vpn() -> Result<()> {
     let _credentials =
         crate::client_credentials::lock_credentials(&crate::client_config::config_path()).await?;
-    let config = load_or_prompt_config().await?;
+    let config = crate::client_credentials::prepare_start(
+        send_request_internal(IpcRequest::Status).await?,
+        load_or_prompt_config,
+    )
+    .await?;
     send_request_with_credentials(start_request(config)).await
 }
 
