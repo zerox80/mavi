@@ -58,38 +58,16 @@ pub fn run_standalone() -> Result<()> {
     Ok(())
 }
 
-pub fn install_service() {
-    let exe_path = match std::env::current_exe() {
-        Ok(path) => path,
-        Err(e) => {
-            error!("Failed to determine current executable path: {}", e);
-            return;
-        }
-    };
-    let quoted_exe_path = format!("\"{}\"", exe_path.display());
+pub fn install_service() -> Result<()> {
+    let exe_path = std::env::current_exe().context("Cannot determine service executable path")?;
     info!("Installing MaviVPNService...");
-    let status = std::process::Command::new("sc")
-        .args([
-            "create",
-            SERVICE_NAME,
-            "binPath=",
-            &quoted_exe_path,
-            "start=",
-            "auto",
-        ])
-        .status();
-
-    match status {
-        Ok(s) if s.success() => {
-            info!("Service installed successfully.");
-            info!("You can now start it with: net start MaviVPNService");
-        }
-        Ok(s) => error!(
-            "Failed to install service. Did you run as Administrator? (Exit code: {:?})",
-            s.code()
-        ),
-        Err(e) => error!("Failed to execute sc command: {}", e),
-    }
+    super::installation::install(&exe_path).context(
+        "Service installation refused. Use an administrator-owned, protected installation \
+         directory such as C:\\Program Files\\MaviVPN and run as Administrator",
+    )?;
+    info!("Service installed successfully.");
+    info!("You can now start it with: net start MaviVPNService");
+    Ok(())
 }
 
 pub fn uninstall_service() {

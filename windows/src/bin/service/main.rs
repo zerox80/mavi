@@ -28,6 +28,7 @@ mod vpn_core;
 mod caller;
 mod cli;
 mod handlers;
+mod installation;
 mod keycloak_refresh;
 mod logging;
 mod main_loop;
@@ -45,7 +46,7 @@ const SERVICE_TYPE: windows_service::service::ServiceType =
 
 define_windows_service!(ffi_service_main, my_service_main);
 
-pub fn main() -> Result<(), windows_service::Error> {
+pub fn main() -> anyhow::Result<()> {
     let args: Vec<OsString> = std::env::args_os().collect();
     let console = args.iter().any(|arg| arg == "--console");
     let install = args.iter().any(|arg| arg == "install");
@@ -54,7 +55,7 @@ pub fn main() -> Result<(), windows_service::Error> {
     if install || uninstall {
         logging::init_console_logging();
         if install {
-            cli::install_service();
+            cli::install_service()?;
         } else {
             cli::uninstall_service();
         }
@@ -75,7 +76,7 @@ pub fn main() -> Result<(), windows_service::Error> {
         return Ok(());
     }
 
-    service_dispatcher::start(SERVICE_NAME, ffi_service_main)
+    service_dispatcher::start(SERVICE_NAME, ffi_service_main).context("Service dispatcher failed")
 }
 
 fn my_service_main(arguments: Vec<OsString>) {

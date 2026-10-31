@@ -195,14 +195,34 @@ The scripts handle everything: building, installing to `C:\Program Files\MaviVPN
 # Build CLI + Service
 cargo build --release -p windows-vpn
 
-# Install service (Administrator required)
-.\target\release\mavi-vpn-service.exe install
+# In an Administrator PowerShell, create a NEW protected installation directory.
+# Do not register the executable directly from the build tree or Downloads.
+$installDir = Join-Path ([Environment]::GetFolderPath('ProgramFiles')) 'MaviVPN'
+New-Item -ItemType Directory -Path $installDir -ErrorAction Stop | Out-Null
+Copy-Item .\target\release\mavi-vpn-service.exe, .\target\release\mavi-vpn-client.exe -Destination $installDir
+icacls.exe $installDir /setowner '*S-1-5-32-544' /T
+if ($LASTEXITCODE -ne 0) { throw 'Cannot set installation owner' }
+& "$installDir\mavi-vpn-service.exe" install
+if ($LASTEXITCODE -ne 0) { throw 'Service installation refused' }
 net start MaviVPNService
 
 # Build GUI (requires cargo-tauri)
 cargo install tauri-cli
 cd gui && cargo tauri build
 ```
+
+The service runs as LocalSystem. Manual registration checks the executable and
+every ancestor for trusted ownership, reparse points, and permissions that allow
+ordinary users to modify or replace the service path. The installation directory
+must also prevent untrusted creation of sibling files. An unsafe path is refused
+without creating a service. If `MaviVPN` already exists, have an administrator
+verify its ownership and permissions before reusing it; do not simply grant broad
+write access or move a user-owned build directory into Program Files.
+
+For an existing manual installation, updating the binary does not relocate the
+saved service path. Use elevated Windows service management tools to stop and
+remove the old registration, then install trusted binaries from a new protected
+directory using the steps above.
 
 ### Usage
 

@@ -80,7 +80,14 @@ gui\src-tauri\target\release\mavi-vpn-gui.exe ← Portable
 
 ```powershell
 # PowerShell als Administrator öffnen
-.\mavi-vpn-service.exe install
+# Neues Verzeichnis mit geerbten Program-Files-Schutzrechten verwenden.
+$installDir = Join-Path ([Environment]::GetFolderPath('ProgramFiles')) 'MaviVPN'
+New-Item -ItemType Directory -Path $installDir -ErrorAction Stop | Out-Null
+Copy-Item .\target\release\mavi-vpn-service.exe, .\target\release\mavi-vpn-client.exe -Destination $installDir
+icacls.exe $installDir /setowner '*S-1-5-32-544' /T
+if ($LASTEXITCODE -ne 0) { throw 'Eigentuemer konnte nicht gesetzt werden' }
+& "$installDir\mavi-vpn-service.exe" install
+if ($LASTEXITCODE -ne 0) { throw 'Service-Installation abgewiesen' }
 
 # Service starten
 net start MaviVPNService
@@ -90,6 +97,20 @@ sc query MaviVPNService
 ```
 
 Der Service startet ab sofort automatisch mit Windows.
+
+Der Dienst läuft als LocalSystem. `install` prüft die EXE und alle übergeordneten
+Verzeichnisse auf vertrauenswürdige Eigentümer und Rechte, die normalen Benutzern
+Schreiben, Austausch oder ACL-Änderungen erlauben. Im Installationsverzeichnis
+dürfen sie auch keine zusätzlichen Dateien anlegen. Unsichere Pfade, Hardlinks
+und Junctions/Symlinks werden vor der Registrierung abgewiesen; der Prozess endet
+mit einem Fehlercode. Nicht direkt aus einem Build-Verzeichnis oder Downloads
+installieren. Ein vorhandenes `MaviVPN`-Verzeichnis zuerst administrativ prüfen;
+kein benutzereigenes Verzeichnis nach Program Files verschieben.
+
+Bei einer vorhandenen manuellen Installation verschiebt ein EXE-Update den
+registrierten Dienstpfad nicht. Die alte Registrierung mit erhöhten Windows-
+Dienstverwaltungswerkzeugen stoppen und entfernen, dann vertrauenswürdige
+Binärdateien aus einem neuen geschützten Verzeichnis wie oben installieren.
 
 ### Schritt 2 – CLI oder GUI starten
 
