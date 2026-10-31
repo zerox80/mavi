@@ -24,6 +24,13 @@ use windows_sys::Win32::Storage::FileSystem::{
     FILE_FLAG_BACKUP_SEMANTICS, FILE_FLAG_OPEN_REPARSE_POINT, FILE_SHARE_READ,
 };
 
+pub const TRUSTED_OWNERS: &[&str] = &[
+    "S-1-5-18",     // SYSTEM
+    "S-1-5-32-544", // Administrators
+    // TrustedInstaller owns some Windows-managed parent directories.
+    "S-1-5-80-956008885-3418522649-1831038044-1853292631-2271478464",
+];
+
 struct LocalAllocation(*mut std::ffi::c_void);
 
 impl Drop for LocalAllocation {
@@ -124,12 +131,7 @@ pub fn ensure_trusted_owner(file: &File) -> Result<()> {
         }
         String::from_utf16_lossy(std::slice::from_raw_parts(sid, len))
     };
-    if !matches!(
-        owner.as_str(),
-        "S-1-5-18" | "S-1-5-32-544" |
-        // TrustedInstaller owns some Windows-managed parent directories.
-        "S-1-5-80-956008885-3418522649-1831038044-1853292631-2271478464"
-    ) {
+    if !TRUSTED_OWNERS.contains(&owner.as_str()) {
         bail!("Untrusted owner {owner}; an administrator must recreate the service path");
     }
     Ok(())
