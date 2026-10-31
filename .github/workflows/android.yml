@@ -59,14 +59,14 @@ jobs:
         run: bash Android-docker-build/build.sh assembleDebug
 
       - name: Upload Android APK
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: android-apk
           path: Android-docker-build/output/apk/debug/*.apk
           if-no-files-found: error
 
       - name: Save lockfile with the fork revisions used for this APK
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: android-build-lockfile
           path: Cargo.lock
