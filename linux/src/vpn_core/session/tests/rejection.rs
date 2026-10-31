@@ -9,6 +9,15 @@ use std::sync::Mutex;
 
 #[tokio::test]
 async fn raw_quic_capacity_rejection_retries_until_stopped() {
+    capacity_rejection_retries_until_stopped(false).await;
+}
+
+#[tokio::test]
+async fn http3_capacity_rejection_retries_until_stopped() {
+    capacity_rejection_retries_until_stopped(true).await;
+}
+
+async fn capacity_rejection_retries_until_stopped(http3: bool) {
     tokio::time::timeout(Duration::from_secs(10), async {
         let generated = rcgen::generate_simple_self_signed(vec!["localhost".into()]).unwrap();
         let cert = CertificateDer::from(generated.cert.der().to_vec());
@@ -25,7 +34,11 @@ async fn raw_quic_capacity_rejection_retries_until_stopped() {
         .with_no_client_auth()
         .with_single_cert(vec![cert], key)
         .unwrap();
-        tls.alpn_protocols = vec![b"mavivpn".to_vec()];
+        tls.alpn_protocols = vec![if http3 {
+            b"h3".to_vec()
+        } else {
+            b"mavivpn".to_vec()
+        }];
         let server_config = quinn::ServerConfig::with_crypto(Arc::new(
             quinn::crypto::rustls::QuicServerConfig::try_from(tls).unwrap(),
         ));
@@ -35,7 +48,7 @@ async fn raw_quic_capacity_rejection_retries_until_stopped() {
             token: "valid-token".into(),
             cert_pin: pin,
             censorship_resistant: false,
-            http3_framing: false,
+            http3_framing: http3,
             http2_framing: false,
             kc_auth: None,
             kc_url: None,
@@ -64,6 +77,32 @@ async fn raw_quic_capacity_rejection_retries_until_stopped() {
             // credentials. Verify a second Auth arrives without another Start.
             for _ in 0..2 {
                 let connection = server.accept().await.unwrap().await.unwrap();
+                if http3 {
+                    let mut h3 = ::h3::server::builder()
+                        .enable_extended_connect(true)
+                        .build::<_, bytes::Bytes>(h3_quinn::Connection::new(connection.clone()))
+                        .await
+                        .unwrap();
+                    let (request, mut stream) = h3
+                        .accept()
+                        .await
+                        .unwrap()
+                        .unwrap()
+                        .resolve_request()
+                        .await
+                        .unwrap();
+                    assert_eq!(request.headers()["authorization"], "Bearer valid-token");
+                    stream
+                        .send_response(http::Response::builder().status(401).body(()).unwrap())
+                        .await
+                        .unwrap();
+                    stream.finish().await.unwrap();
+                    tokio::select! {
+                        _ = connection.closed() => {},
+                        _ = h3.accept() => {},
+                    }
+                    continue;
+                }
                 let (mut send, mut recv) = connection.accept_bi().await.unwrap();
                 let body = control::read_control_frame(&mut recv, control::MAX_CONTROL_FRAME_BYTES)
                     .await
@@ -90,7 +129,11 @@ async fn raw_quic_capacity_rejection_retries_until_stopped() {
             assert!(assigned_ip.lock().unwrap().is_none());
             assert_eq!(
                 last_error.lock().unwrap().as_deref(),
-                Some("Server rejected connection: Unauthorized")
+                Some(if http3 {
+                    "Server rejected connection: HTTP 401 Unauthorized"
+                } else {
+                    "Server rejected connection: Unauthorized"
+                })
             );
             running.store(false, Ordering::Relaxed);
         };
