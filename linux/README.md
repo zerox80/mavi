@@ -73,6 +73,7 @@ mavi-vpn start -c /etc/mavi-vpn/mavi-vpn.json
 
 # Trennen
 mavi-vpn stop
+mavi-vpn stop -c /etc/mavi-vpn/mavi-vpn.json
 
 # Status
 mavi-vpn status
@@ -206,6 +207,13 @@ Refresh-Token landen im OS-Schlüsselbund (Secret Service, z. B. GNOME Keyring /
 Ist kein Schlüsselbund erreichbar (z. B. `sudo` ohne User-Session-Bus), bleibt nur ein
 Preshared Key in der `600`-Datei; Keycloak-Tokens werden dann nie auf die Platte geschrieben
 und beim nächsten Start ist ein erneuter Browser-Login nötig.
+
+Im CLI-Daemonmodus haelt der Daemon rotierte Keycloak-Refresh-Tokens im RAM,
+bis die CLI sie beim Stoppen oder vor dem naechsten Start im Benutzer-Schluesselbund
+speichert und die Speicherung bestaetigt. Bei einer eigenen Config-Datei auch
+`stop -c <Datei>` verwenden. Ein Daemon-Absturz vor der Uebergabe kann weiterhin
+einen neuen Browser-Login erfordern; Keycloak-Tokens werden nicht als Klartext
+im Root-Daemon auf Platte gespeichert.
 
 **Beispiel-Config (`mavi-vpn.json`):**
 ```json

@@ -50,7 +50,7 @@ impl SecretStore for KeyringSecretStore {
 /// Keyring account names for the secrets belonging to one config file.
 pub(super) struct SecretAccounts {
     token: String,
-    refresh_token: String,
+    pub(super) refresh_token: String,
 }
 
 impl SecretAccounts {

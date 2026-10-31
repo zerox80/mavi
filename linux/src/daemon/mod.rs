@@ -15,6 +15,7 @@ use tokio::sync::{Mutex, OwnedSemaphorePermit, Semaphore};
 
 use tracing::{error, info, warn};
 
+mod credentials;
 mod scoped;
 mod transport;
 pub use transport::send_request;
@@ -39,6 +40,7 @@ struct DaemonState {
     vpn_task: Option<tokio::task::JoinHandle<()>>,
     active_config: Option<Config>,
     session_id: Option<String>,
+    refresh_updates: credentials::RefreshUpdates,
 }
 
 impl DaemonState {
@@ -53,6 +55,7 @@ impl DaemonState {
             vpn_task: None,
             active_config: None,
             session_id: None,
+            refresh_updates: credentials::RefreshUpdates::default(),
         }
     }
 }
@@ -166,6 +169,20 @@ async fn dispatch_request_with_hooks(
         Ok(request) => request,
         Err(response) => return response,
     };
+    let (req, credential_id) = match req {
+        IpcRequest::StartWithKeycloak {
+            mut config,
+            keycloak,
+        } => {
+            config.kc_auth = Some(true);
+            config.kc_url = Some(keycloak.kc_url);
+            config.kc_realm = Some(keycloak.realm);
+            config.kc_client_id = Some(keycloak.client_id);
+            config.refresh_token = Some(keycloak.refresh_token);
+            (IpcRequest::Start(config), Some(keycloak.connection_id))
+        }
+        req => (req, None),
+    };
     match req {
         IpcRequest::Status => {
             let running = guard.vpn_running.load(Ordering::SeqCst);
@@ -268,6 +285,8 @@ async fn dispatch_request_with_hooks(
                     let assigned_ip = guard.assigned_ip.clone();
                     let current_token = guard.current_token.clone();
                     let refresh_token = Arc::new(StdMutex::new(config.refresh_token.clone()));
+                    let persist_tokens =
+                        credential_id.map(|id| guard.refresh_updates.publisher(id));
 
                     guard.vpn_task = Some(tokio::spawn(async move {
                         if let Err(e) = crate::vpn_core::run_vpn(
@@ -278,7 +297,7 @@ async fn dispatch_request_with_hooks(
                             assigned_ip.clone(),
                             current_token,
                             refresh_token,
-                            None,
+                            persist_tokens,
                         )
                         .await
                         {
@@ -310,17 +329,24 @@ async fn dispatch_request_with_hooks(
             }
             IpcResponse::Ok
         }
-        IpcRequest::StartWithKeycloak { .. } => IpcResponse::Error(
-            "Service-side Keycloak refresh is only supported on Windows".to_string(),
-        ),
-        IpcRequest::TakeRefreshTokenUpdate | IpcRequest::TakeRefreshTokenUpdateFor { .. } => {
-            IpcResponse::RefreshTokenUpdate {
-                connection_id: None,
-                refresh_token: None,
-            }
+        IpcRequest::TakeRefreshTokenUpdateFor { connection_id } => {
+            guard.refresh_updates.get(&connection_id)
         }
-        IpcRequest::AcknowledgeRefreshTokenUpdate { .. } => IpcResponse::Ok,
-        IpcRequest::StartScoped { .. }
+        IpcRequest::AcknowledgeRefreshTokenUpdate {
+            connection_id,
+            refresh_token,
+        } => {
+            guard
+                .refresh_updates
+                .acknowledge(&connection_id, &refresh_token);
+            IpcResponse::Ok
+        }
+        IpcRequest::TakeRefreshTokenUpdate => IpcResponse::RefreshTokenUpdate {
+            connection_id: None,
+            refresh_token: None,
+        },
+        IpcRequest::StartWithKeycloak { .. }
+        | IpcRequest::StartScoped { .. }
         | IpcRequest::SessionStatus { .. }
         | IpcRequest::UpdateSessionToken { .. }
         | IpcRequest::StopSession { .. } => {
@@ -329,6 +355,8 @@ async fn dispatch_request_with_hooks(
     }
 }
 
+#[cfg(test)]
+mod credential_tests;
 #[cfg(test)]
 mod ipc_limit_tests;
 #[cfg(test)]
