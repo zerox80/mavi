@@ -129,6 +129,33 @@ fn enrollment_uses_the_configured_vpn_client_id() {
     assert_eq!(config.keycloak.client_id, "mavi-panel");
 }
 
+#[tokio::test]
+async fn http2_enrollment_ignores_the_ech_file() {
+    let mut env = values();
+    env.insert("MAVI_PANEL_TRANSPORT", "http2".into());
+    let mut config = load(env).unwrap();
+    let files = tempfile::tempdir().unwrap();
+    config.cert_pin_file = files.path().join("cert_pin.txt");
+    config.ech_config_file = files.path().join("ech_config_hex.txt");
+    std::fs::write(&config.cert_pin_file, "cd".repeat(32)).unwrap();
+    std::fs::write(&config.ech_config_file, "00ff").unwrap();
+    let device_id = "0b858e3f-a9c5-4ae5-a859-b556e6ba70c0";
+
+    let profile = config
+        .enrollment_profile(device_id.into(), "Work laptop".into())
+        .await
+        .unwrap();
+    assert_eq!(profile.transport, EnrollmentTransport::Http2);
+    assert_eq!(profile.ech_config, None);
+
+    config.transport = PanelTransport::Http3;
+    let profile = config
+        .enrollment_profile(device_id.into(), "Work laptop".into())
+        .await
+        .unwrap();
+    assert_eq!(profile.ech_config.as_deref(), Some("00ff"));
+}
+
 #[test]
 fn invalid_server_values_fail_during_configuration() {
     let mut endpoint_values = values();
@@ -138,4 +165,8 @@ fn invalid_server_values_fail_during_configuration() {
     let mut transport_values = values();
     transport_values.insert("MAVI_PANEL_TRANSPORT", "websocket".into());
     assert!(load(transport_values).is_err());
+
+    let mut client_values = values();
+    client_values.insert("MAVI_PANEL_VPN_CLIENT_ID", "mavi-panel".into());
+    assert!(load(client_values).is_err());
 }

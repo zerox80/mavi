@@ -2,7 +2,9 @@ use super::{authenticate, check_mutation, no_content, ApiError};
 use crate::db::devices::{self, Device};
 use crate::db::sessions::{self, SessionResponse};
 use crate::oidc::Identity;
-use crate::security::{is_admin, normalized_label, random_token, DevicePlatform};
+use crate::security::{
+    hash_token, is_admin, normalized_label, random_token, session_csrf_token, DevicePlatform,
+};
 use crate::state::AppState;
 use axum::extract::rejection::JsonRejection;
 use axum::extract::{Path, State};
@@ -53,11 +55,16 @@ pub async fn session(
     headers: HeaderMap,
 ) -> Result<Json<SessionResponse>, ApiError> {
     let authenticated = authenticate(&state, &headers).await?;
-    let csrf_token = random_token().map_err(|_| ApiError::internal("CSRF randomness"))?;
-    let session = sessions::rotate_csrf(&state.pool, &authenticated.token, &csrf_token)
-        .await
-        .map_err(|_| ApiError::internal("CSRF rotation"))?
-        .ok_or_else(|| ApiError::new(StatusCode::UNAUTHORIZED, "Authentication is required"))?;
+    let csrf_token = session_csrf_token(&authenticated.token);
+    let session = if authenticated.session.csrf_hash == hash_token(&csrf_token) {
+        authenticated.session
+    } else {
+        // Upgrade sessions created before CSRF tokens were tied to the session.
+        sessions::set_csrf(&state.pool, &authenticated.token, &csrf_token)
+            .await
+            .map_err(|_| ApiError::internal("CSRF update"))?
+            .ok_or_else(|| ApiError::new(StatusCode::UNAUTHORIZED, "Authentication is required"))?
+    };
     let is_admin = is_admin(&session.roles);
     Ok(Json(SessionResponse {
         username: session.username,

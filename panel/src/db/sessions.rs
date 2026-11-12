@@ -103,7 +103,7 @@ pub async fn find_session(pool: &PgPool, token: &str) -> Result<Option<Session>,
     row.map(session_from_row).transpose()
 }
 
-pub async fn rotate_csrf(
+pub async fn set_csrf(
     pool: &PgPool,
     token: &str,
     csrf_token: &str,

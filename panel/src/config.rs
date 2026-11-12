@@ -123,6 +123,11 @@ impl Config {
         let client_secret = required("MAVI_PANEL_CLIENT_SECRET", &mut lookup)?;
         let vpn_client_id =
             lookup("MAVI_PANEL_VPN_CLIENT_ID").unwrap_or_else(|| "mavi-client".into());
+        if vpn_client_id == client_id {
+            return Err(ConfigError::new(
+                "MAVI_PANEL_VPN_CLIENT_ID must identify a different client from MAVI_PANEL_CLIENT_ID",
+            ));
+        }
         let proxy_token = lookup("MAVI_PANEL_PROXY_TOKEN").filter(|value| !value.is_empty());
         if proxy_token.as_deref().is_some_and(|value| {
             !(32..=128).contains(&value.len())
@@ -223,7 +228,11 @@ impl Config {
         label: String,
     ) -> Result<EnrollmentProfile, ConfigError> {
         let cert_pin = read_required_file(&self.cert_pin_file).await?;
-        let ech_config = read_optional_file(&self.ech_config_file).await?;
+        let ech_config = if self.transport == PanelTransport::Http2 {
+            None
+        } else {
+            read_optional_file(&self.ech_config_file).await?
+        };
         let profile = self.profile_from_files(device_id, label, cert_pin, ech_config)?;
         profile.validate().map_err(ConfigError::new)?;
         Ok(profile)

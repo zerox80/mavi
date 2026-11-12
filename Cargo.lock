@@ -2953,6 +2953,7 @@ dependencies = [
  "shared",
  "sqlx",
  "sqlx-postgres",
+ "tempfile",
  "thiserror 2.0.21",
  "tokio",
  "tower",

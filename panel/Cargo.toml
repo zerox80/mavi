@@ -38,4 +38,5 @@ uuid = { version = "1", features = ["serde", "v4"] }
 
 [dev-dependencies]
 rcgen = { workspace = true }
+tempfile = { workspace = true }
 tower = { version = "0.5", features = ["util"] }

@@ -125,6 +125,8 @@ docker compose up -d
 
 Do not add `--profile` or `-f`: Docker Compose reads `COMPOSE_FILE` and `COMPOSE_PROFILES` automatically from `backend/.env`. This command also starts the panel dependencies after the one-time bootstrap has completed. To rebuild local images after a source update, run `docker compose build --pull` before `docker compose up -d`.
 
+If an existing panel installation has no `MAVI_PANEL_PROXY_TOKEN`, rerun `./install-server.sh` from the repository root when upgrading. The installer generates the token and updates managed Nginx. For an external reverse proxy, apply the panel headers described in [External reverse proxy](#external-reverse-proxy) and forward the panel hostname directly to its loopback port so the rate limiter uses each client's IP.
+
 ### Client credentials
 
 For classic mode, read the generated token and certificate PIN on the server and enter them manually in the client:
