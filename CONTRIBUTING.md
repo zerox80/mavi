@@ -56,7 +56,9 @@ For the server Docker setup:
 cd backend
 cp .env.example .env
 # edit .env and set a real VPN_AUTH_TOKEN
-docker-compose up -d --build
+# build your working tree instead of pulling the published image:
+export COMPOSE_FILE=docker-compose.yml:docker-compose.build.yml
+docker compose up -d --build
 ```
 
 The Android app needs Android Studio, the Android NDK, and `cargo-ndk`.

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+from dataclasses import replace
 import os
 from pathlib import Path
 import shlex
@@ -163,6 +164,7 @@ def print_summary(plan: InstallPlan, values: Mapping[str, str], env_path: Path, 
     if plan.uses_keycloak:
         print(f"  Keycloak URL:  {values['VPN_KEYCLOAK_URL']}")
         print(f"  Proxy mode:    {PROXY_LABELS[plan.proxy]}")
+    print(f"  Images:        {'built from source on this host' if plan.source_build else 'prebuilt, pulled from the registry'}")
     if plan.uses_panel:
         print(f"  Panel URL:     https://panel.{values['DOMAIN_NAME']}")
         print(f"  VPN endpoint:  {values['MAVI_PANEL_VPN_ENDPOINT']}")
@@ -245,14 +247,30 @@ def prepare_private_paths(backend: Path, standalone: bool) -> None:
         os.chmod(acme, 0o600)
 
 
+def start_services(backend: Path, services: list[str], source_build: bool) -> None:
+    """Start services from prebuilt images, or compile them when the plan asks for it."""
+    if source_build:
+        run(["docker", "compose", "up", "-d", "--build", *services], backend)
+        return
+    try:
+        run(["docker", "compose", "pull", *services], backend)
+    except subprocess.CalledProcessError:
+        print(
+            "Could not pull the container images. Check registry access, or rerun with "
+            "--build-from-source to compile them on this host.",
+            file=sys.stderr,
+        )
+        raise
+    run(["docker", "compose", "up", "-d", *services], backend)
+
+
 def start_stack(backend: Path, plan: InstallPlan, values: dict[str, str]) -> int:
+    services = ["vpn-server"]
     if plan.uses_keycloak:
-        services = ["vpn-server", "keycloak-db", "keycloak"]
+        services += ["keycloak-db", "keycloak"]
         if plan.proxy == PROXY_TRAEFIK or uses_traefik_profile(values):
             services.append("traefik")
-        run(["docker", "compose", "up", "-d", "--build", *services], backend)
-    else:
-        run(["docker", "compose", "up", "-d", "--build", "vpn-server"], backend)
+    start_services(backend, services, plan.source_build)
     if not plan.uses_panel:
         return 0
     admin = bootstrap_panel(
@@ -268,7 +286,7 @@ def start_stack(backend: Path, plan: InstallPlan, values: dict[str, str]) -> int
         print("The password must be changed at the first login; it is not stored by the installer.")
     elif admin:
         print(f"Panel administrator already exists; password and existing roles were preserved: {admin.username}")
-    run(["docker", "compose", "up", "-d", "--build", "panel"], backend)
+    start_services(backend, ["panel"], plan.source_build)
     return 0
 
 
@@ -286,7 +304,9 @@ def parser() -> argparse.ArgumentParser:
     result.add_argument("--admin-username", default="panel-admin")
     result.add_argument("--admin-email", default="")
     result.add_argument("--yes", action="store_true", help="apply a non-interactive plan")
-    result.add_argument("--no-start", action="store_true", help="write configuration without building or starting containers")
+    result.add_argument("--no-start", action="store_true", help="write configuration without pulling or starting containers")
+    result.add_argument("--build-from-source", action="store_true",
+                        help="compile the server images on this host instead of pulling prebuilt images")
     return result
 
 
@@ -300,7 +320,9 @@ def main(argv: list[str] | None = None) -> int:
             raise ConfigurationError(f"Backend Compose file not found: {backend / 'docker-compose.yml'}")
         existing = load_env(env_path)
         plan = argument_plan(args, existing) if args.non_interactive else interactive_plan(existing)
-        if plan.uses_panel and not (root / "panel" / "Dockerfile").is_file():
+        if args.build_from_source:
+            plan = replace(plan, source_build=True)
+        if plan.uses_panel and plan.source_build and not (root / "panel" / "Dockerfile").is_file():
             raise ConfigurationError(f"Panel Dockerfile not found: {root / 'panel' / 'Dockerfile'}")
         values, generated = build_configuration(plan, existing)
         print_summary(plan, values, env_path, generated)
@@ -346,6 +368,10 @@ def main(argv: list[str] | None = None) -> int:
             start_stack(backend, plan, values)
         print("\nInstallation finished.")
         print("Restart later with: cd backend && docker compose up -d")
+        if plan.source_build:
+            print("Update later with:  git pull --ff-only && cd backend && docker compose up -d --build")
+        else:
+            print("Update later with:  git pull --ff-only && cd backend && docker compose pull && docker compose up -d")
         if plan.uses_panel and not args.no_start:
             print(f"Open https://panel.{values['DOMAIN_NAME']} after the panel becomes ready.")
         return 0

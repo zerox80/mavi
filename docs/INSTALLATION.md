@@ -47,6 +47,19 @@ Non-interactive installation uses the same defaults and requires explicit confir
 
 Use `--proxy external` instead of an ACME email when an existing reverse proxy instance terminates TLS. `--proxy` also accepts `nginx` (default) and `traefik` (legacy standalone). Use `--no-start` to write only the configuration. A new non-interactive installation needs `--mode`; Keycloak and panel modes also need `--domain`.
 
+### Container images
+
+The installer does not compile anything on the server. It pulls prebuilt Linux AMD64 and ARM64 images and starts them:
+
+| Service | Image | Pin with |
+| --- | --- | --- |
+| VPN server | `ghcr.io/zerox80/mavi-vpn:latest` | `MAVI_IMAGE` |
+| Web panel | `ghcr.io/zerox80/mavi-panel:latest` | `MAVI_PANEL_IMAGE` |
+
+Both images are published from `main` by the [Publish server images](https://github.com/zerox80/mavi/actions/workflows/publish-server.yml) workflow, from the same source revision. `latest` is the most recent successful build, not a versioned release. Every build also gets a `build-<run-id>-<attempt>` tag, listed in the workflow run summary; set `MAVI_IMAGE` or `MAVI_PANEL_IMAGE` in `backend/.env` to that tag or to an `@sha256:<digest>` reference to pin or roll back. The VPN image is the same one that [docker/server](../docker/server/README.md) deploys.
+
+To compile the images on the host instead, pass `--build-from-source`. The installer then appends the build overrides to `COMPOSE_FILE` and runs `docker compose up -d --build`. A Rust release build needs considerably more memory and time than pulling an image. An existing `.env` keeps whichever variant its `COMPOSE_FILE` selects.
+
 ### Configuration and secret storage
 
 The installer works in `backend/` and writes `backend/.env` atomically with mode `0600`. It changes an existing file only when effective settings are missing or need correction. Before such a change, it stores the previous file with mode `0600` in `backend/data/env-backups/`; an unchanged rerun creates no backup. The backup directory is mode `0700` and is covered by the existing `backend/data/` Git ignore rule.
@@ -60,6 +73,8 @@ The selected Compose files are stored in `.env`:
 | Classic | `docker-compose.yml` |
 | Keycloak only | `docker-compose.yml:keycloak/docker-compose.yml` |
 | Web panel | `docker-compose.yml:keycloak/docker-compose.yml:panel/docker-compose.yml` |
+
+A source build appends `docker-compose.build.yml` and, in panel mode, `panel/docker-compose.build.yml` to the end of that list.
 
 Panel mode also sets `MAVI_WEB_PANEL_ENABLED=true`, forces `VPN_KEYCLOAK_ENABLED=true`, and defaults `VPN_KEYCLOAK_REQUIRED_ROLE` to `vpn-user`. `MAVI_PANEL_VPN_ENDPOINT` is written explicitly because nested Compose interpolation is not portable. Keycloak and the panel always publish loopback-only HTTP ports (`127.0.0.1:18080` and `127.0.0.1:18081`) for the reverse proxy.
 
@@ -116,16 +131,40 @@ To create the initial administrator later, append `--create-admin --admin-userna
 
 ### Starting and restarting
 
-The installer performs the initial build and ordered start. After it finishes, restart the complete selected stack from `backend/` with exactly:
+The installer pulls the images and performs the ordered first start. After it finishes, restart the complete selected stack from `backend/` with exactly:
 
 ```bash
 cd /path/to/mavi-vpn/backend
 docker compose up -d
 ```
 
-Do not add `--profile` or `-f`: Docker Compose reads `COMPOSE_FILE` and `COMPOSE_PROFILES` automatically from `backend/.env`. This command also starts the panel dependencies after the one-time bootstrap has completed. To rebuild local images after a source update, run `docker compose build --pull` before `docker compose up -d`.
+Do not add `--profile` or `-f`: Docker Compose reads `COMPOSE_FILE` and `COMPOSE_PROFILES` automatically from `backend/.env`. This command also starts the panel dependencies after the one-time bootstrap has completed.
+
+### Updating
+
+Updates never happen automatically. Fetch the current Compose files, pull the newer images, and recreate the containers that changed:
+
+```bash
+cd /path/to/mavi-vpn
+git pull --ff-only
+cd backend
+docker compose pull
+docker compose up -d
+```
+
+Git does not touch `.env` or `data/`. Active VPN connections are interrupted while the VPN container is replaced, and clients reconnect. Rerunning `./install-server.sh` is not required for a regular update.
 
 If an existing panel installation has no `MAVI_PANEL_PROXY_TOKEN`, rerun `./install-server.sh` from the repository root when upgrading. The installer generates the token and updates managed Nginx. For an external reverse proxy, apply the panel headers described in [External reverse proxy](#external-reverse-proxy) and forward the panel hostname directly to its loopback port so the rate limiter uses each client's IP.
+
+A source-build installation updates with `git pull --ff-only` followed by `docker compose up -d --build` instead.
+
+### Switching an older source build to prebuilt images
+
+Installations created before the prebuilt images became the default compiled the VPN server locally. After `git pull`, the same `docker compose pull` and `docker compose up -d` replace that local build with the published image; `.env`, certificates, and the certificate PIN in `data/` are kept. To keep compiling locally, append the build override to `COMPOSE_FILE` in `backend/.env` before starting:
+
+```bash
+COMPOSE_FILE=docker-compose.yml:docker-compose.build.yml
+```
 
 ### Client credentials
 

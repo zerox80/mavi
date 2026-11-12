@@ -1,8 +1,9 @@
 services:
   vpn-server:
-    build:
-      context: ..
-      dockerfile: Dockerfile
+    # Prebuilt AMD64/ARM64 image; update with `docker compose pull`. Pin a build
+    # with MAVI_IMAGE. To compile on this host instead, add
+    # docker-compose.build.yml to COMPOSE_FILE.
+    image: ${MAVI_IMAGE:-ghcr.io/zerox80/mavi-vpn:latest}
     container_name: mavi-vpn
     restart: unless-stopped
     network_mode: host # Direct host networking for native IPv6 support
