@@ -1,0 +1,12 @@
+# Optional override: compile the web panel on this host instead of pulling the
+# prebuilt image. Append it after panel/docker-compose.yml in COMPOSE_FILE and
+# start with `docker compose up -d --build`.
+services:
+  panel:
+    # A local tag keeps the source build apart from the registry image.
+    image: mavi-panel:source
+    build:
+      # Compose resolves relative paths against the project directory
+      # (backend/), not against this file, so `..` is the repository root.
+      context: ..
+      dockerfile: panel/Dockerfile

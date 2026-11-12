@@ -388,7 +388,9 @@ When switching publishing to this repository, disable the old repository's
 Actions access with write permission if it is currently linked only to the
 old repository.
 
-The `Publish VPN server image` workflow runs when server/build inputs change on
+The `Publish server images` workflow also publishes the web panel image
+`ghcr.io/zerox80/mavi-panel` used by the full stack in `backend/`.
+It runs when server/build inputs change on
 `main`, is scheduled daily at 06:17 UTC, and can be started manually through
 **Actions → Run workflow**. Server source and build input changes trigger a
 build directly. The daily run also picks up new h2/h3/Quinn fork commits.
@@ -413,6 +415,7 @@ GHCR authentication automatically uses `GITHUB_TOKEN` with `packages: write`.
 No additional registry secrets are required.
 **After the first publication, set the GHCR package visibility to Public:**
 GitHub profile → Packages → `mavi-vpn` → Package settings → Change visibility → Public.
+The same one-time step applies to the `mavi-panel` package after its first publication.
 A public Git repository does not automatically make a new container package
 public. This step allows `docker compose pull` to work without logging in to GitHub.
 See the [GitHub Container Registry documentation](https://docs.github.com/en/packages/working-with-a-github-packages-registry/working-with-the-container-registry).

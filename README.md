@@ -95,10 +95,13 @@ and set `VPN_DISABLE_IPV6=false` before connecting those clients.
 Images are built from `main`; `latest` is not a versioned release image. See the
 [update and rollback instructions](docker/server/README.md#updates-and-rollbacks).
 
-### Server Deployment (Build from Source)
+### Server Deployment (Full Stack in `backend/`)
 
-Use this repository to build the server locally or run the optional
-Keycloak/Traefik stack:
+Use `backend/` for the complete stack with optional Keycloak, web panel, and
+Traefik. It pulls the same prebuilt VPN image, plus `ghcr.io/zerox80/mavi-panel`
+for the panel; `./install-server.sh` sets all of this up for you. Update with
+`git pull --ff-only`, `docker compose pull`, and `docker compose up -d`. For a
+manual token-only setup:
 
 ```bash
 git clone https://github.com/zerox80/mavi-vpn.git
@@ -122,9 +125,14 @@ the current Windows client on `main` requires IPv6. This repository's
 `.env.example` enables CR mode, so select the matching mode in the client.
 
 ```bash
-docker compose up -d --build
+docker compose pull
+docker compose up -d
 docker compose logs --tail=100 vpn-server
 ```
+
+To compile the server on the host instead of pulling the image, set
+`COMPOSE_FILE=docker-compose.yml:docker-compose.build.yml` in `.env` and run
+`docker compose up -d --build`.
 
 Once the server has started, retrieve the certificate pin:
 
@@ -376,7 +384,7 @@ Full enterprise SSO with Keycloak:
    COMPOSE_FILE=docker-compose.yml:keycloak/docker-compose.yml
    COMPOSE_PROFILES=traefik,keycloak
    ```
-   From `backend/`, run `docker compose up -d --build` to start the enabled services.
+   From `backend/`, run `docker compose pull` and `docker compose up -d` to start the enabled services.
 3. On first start, Keycloak **auto-imports** the `mavi-vpn` realm from `backend/keycloak/mavi-vpn-realm.json` — including the `mavi-client` public PKCE client, the `vpn-user` realm role, and token lifespans tuned for the VPN refresh cycle (10 min access token, 1 h SSO idle, 24 h SSO max). You only need to create your users in the Keycloak admin console; the realm and client setup is automated. See `docs/INSTALLATION.md` Step 4 for details.
 4. Clients authenticate via **browser-based PKCE OAuth2** — the CLI/GUI opens a local HTTP server on port `18923`, redirects to Keycloak, and captures the JWT automatically.
 5. Android release builds must use a verified HTTPS App Link redirect. Build with `-Pmavi.oauthRedirectUri=https://<verified-domain>/<callback-path>`, register that exact URI in Keycloak, and host `/.well-known/assetlinks.json` for the `com.mavi.vpn` package. Debug builds use `com.mavi.vpn://oauth/callback` by default.

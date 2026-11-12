@@ -27,9 +27,10 @@ services:
       - no-new-privileges:true
 
   panel:
-    build:
-      context: ../..
-      dockerfile: panel/Dockerfile
+    # Prebuilt AMD64/ARM64 image; update with `docker compose pull`. Pin a build
+    # with MAVI_PANEL_IMAGE. To compile on this host instead, add
+    # panel/docker-compose.build.yml to COMPOSE_FILE.
+    image: ${MAVI_PANEL_IMAGE:-ghcr.io/zerox80/mavi-panel:latest}
     restart: unless-stopped
     user: "${MAVI_PANEL_USER:-1000:1000}"
     cap_drop:

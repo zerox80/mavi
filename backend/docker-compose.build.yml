@@ -1,0 +1,11 @@
+# Optional override: compile the VPN server on this host instead of pulling the
+# prebuilt image. Append it to COMPOSE_FILE in .env, for example:
+#   COMPOSE_FILE=docker-compose.yml:docker-compose.build.yml
+# and start with `docker compose up -d --build`.
+services:
+  vpn-server:
+    # A local tag keeps the source build apart from the registry image.
+    image: mavi-vpn:source
+    build:
+      context: ..
+      dockerfile: Dockerfile

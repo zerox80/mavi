@@ -22,6 +22,9 @@ PROXY_EXTERNAL = "external"
 BASE_COMPOSE = "docker-compose.yml"
 KEYCLOAK_COMPOSE = "keycloak/docker-compose.yml"
 PANEL_COMPOSE = "panel/docker-compose.yml"
+# Optional overrides that compile the images on the host instead of pulling them.
+BUILD_COMPOSE = "docker-compose.build.yml"
+PANEL_BUILD_COMPOSE = "panel/docker-compose.build.yml"
 _SECRET_KEYS = (
     "VPN_AUTH_TOKEN",
     "KEYCLOAK_DB_PASSWORD",
@@ -47,6 +50,7 @@ class InstallPlan:
     admin_username: str = "panel-admin"
     admin_email: str = ""
     existing: bool = False
+    source_build: bool = False
 
     @property
     def uses_keycloak(self) -> bool:
@@ -79,14 +83,26 @@ def mode_from_environment(values: Mapping[str, str]) -> str:
     return CLASSIC
 
 
-def compose_file_for_mode(mode: str) -> str:
+def source_build_from_environment(values: Mapping[str, str]) -> bool:
+    """An existing installation compiles locally when COMPOSE_FILE lists the build override."""
+    return BUILD_COMPOSE in values.get("COMPOSE_FILE", "").split(":")
+
+
+def compose_file_for_mode(mode: str, source_build: bool = False) -> str:
     if mode == PANEL:
-        return f"{BASE_COMPOSE}:{KEYCLOAK_COMPOSE}:{PANEL_COMPOSE}"
-    if mode == KEYCLOAK:
-        return f"{BASE_COMPOSE}:{KEYCLOAK_COMPOSE}"
-    if mode == CLASSIC:
-        return BASE_COMPOSE
-    raise ConfigurationError(f"Unknown installation mode: {mode}")
+        files = [BASE_COMPOSE, KEYCLOAK_COMPOSE, PANEL_COMPOSE]
+    elif mode == KEYCLOAK:
+        files = [BASE_COMPOSE, KEYCLOAK_COMPOSE]
+    elif mode == CLASSIC:
+        files = [BASE_COMPOSE]
+    else:
+        raise ConfigurationError(f"Unknown installation mode: {mode}")
+    if source_build:
+        # Overrides come last so they replace the prebuilt image references.
+        files.append(BUILD_COMPOSE)
+        if mode == PANEL:
+            files.append(PANEL_BUILD_COMPOSE)
+    return ":".join(files)
 
 
 def validate_domain(domain: str) -> str:
@@ -132,6 +148,7 @@ def plan_from_existing(values: Mapping[str, str]) -> InstallPlan:
         acme_email=values.get("ACME_EMAIL", ""),
         proxy=proxy_from_environment(values),
         existing=True,
+        source_build=source_build_from_environment(values),
     )
 
 
@@ -165,7 +182,7 @@ def build_configuration(
             "VPN_MSS_CLAMPING": values.get("VPN_MSS_CLAMPING", "true"),
             "MAVI_WEB_PANEL_ENABLED": "true" if plan.uses_panel else "false",
             "VPN_KEYCLOAK_ENABLED": "true" if plan.uses_keycloak else "false",
-            "COMPOSE_FILE": compose_file_for_mode(plan.mode),
+            "COMPOSE_FILE": compose_file_for_mode(plan.mode, plan.source_build),
             "COMPOSE_PROFILES": values.get(
                 "COMPOSE_PROFILES",
                 "traefik" if plan.proxy == PROXY_TRAEFIK and plan.uses_keycloak else "",
