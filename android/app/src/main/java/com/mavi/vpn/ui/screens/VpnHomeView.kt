@@ -77,7 +77,7 @@ fun HomeView(
         else -> StatusTone.NEUTRAL
     }
     val statusDetail = when {
-        isConnected -> "Traffic is routed through this connection"
+        isConnected -> "VPN tunnel is active"
         isConnecting -> "Establishing a secure connection…"
         isPaused && pauseRemaining == 0L -> "Waiting to resume"
         isPaused -> "Resumes in ${formatPauseRemaining(pauseRemaining)}"
@@ -136,7 +136,17 @@ fun HomeView(
         MaviCard {
             Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 20.dp)) {
                 StatusPill(label = statusLabel, tone = statusTone, pulsing = isConnecting)
-                Spacer(modifier = Modifier.height(14.dp))
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(text = statusDetail, style = MaterialTheme.typography.bodyMedium, color = T.mute)
+            }
+            MaviDivider()
+            Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
+                Text(
+                    text = "Next connection",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = T.mute,
+                )
+                Spacer(modifier = Modifier.height(4.dp))
                 Text(
                     text = serverIp.ifEmpty { "No endpoint configured" },
                     style = MaterialTheme.typography.headlineSmall,
@@ -144,8 +154,6 @@ fun HomeView(
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(text = statusDetail, style = MaterialTheme.typography.bodyMedium, color = T.mute)
             }
             MaviDivider()
             DetailRow(label = "Port", value = serverPort.ifEmpty { "—" }, mono = true)

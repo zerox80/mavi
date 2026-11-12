@@ -47,15 +47,8 @@ export function renderConnectionList() {
 
   for (const c of filtered) {
     const row = document.createElement('div');
-    const isSelected = c.id === state.prefs.active_id;
-    const isSession = c.id === state.sessionConnection?.id;
-    const isActive = isSession && state.hero === 'on';
-    const isConnecting = isSession && state.hero === 'connecting';
-    row.className =
-      'conn-row' +
-      (isSelected ? ' selected' : '') +
-      (isActive ? ' active' : '') +
-      (isConnecting ? ' connecting' : '');
+    row.className = 'conn-row';
+    row.dataset.connectionId = c.id;
     row.tabIndex = 0;
     row.setAttribute('role', 'button');
     row.addEventListener('click', () => selectConnection(c.id));
@@ -91,6 +84,20 @@ export function renderConnectionList() {
     });
     list.appendChild(row);
   }
+  updateConnectionListState();
+}
+
+export function updateConnectionListState() {
+  const rows = $('connection-list')?.querySelectorAll('.conn-row');
+  if (!rows) return;
+
+  for (const row of rows) {
+    const id = row.dataset.connectionId;
+    const isSession = id === state.sessionConnection?.id;
+    row.classList.toggle('selected', id === state.prefs.active_id);
+    row.classList.toggle('active', isSession && state.hero === 'on');
+    row.classList.toggle('connecting', isSession && state.hero === 'connecting');
+  }
 }
 
 export async function selectConnection(id) {
@@ -102,7 +109,7 @@ export async function selectConnection(id) {
     state.prefs.active_id = previous;
     showToast('Could not save the selected connection. Please try again.', 'error');
   }
-  renderConnectionList();
+  updateConnectionListState();
   if (_applyHero) _applyHero();
 }
 

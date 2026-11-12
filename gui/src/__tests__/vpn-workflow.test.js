@@ -24,7 +24,7 @@ vi.mock('../toast.js', () => ({
 }));
 
 vi.mock('../connections.js', () => ({
-  renderConnectionList: vi.fn(),
+  updateConnectionListState: vi.fn(),
 }));
 
 function setupVpnDom() {

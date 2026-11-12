@@ -1,7 +1,7 @@
 import { state, $ } from './state.js';
 import { invoke } from './api.js';
 import { showToast, hideToast, showServiceOfflineHint, daemonHintText } from './toast.js';
-import { renderConnectionList } from './connections.js';
+import { updateConnectionListState } from './connections.js';
 import { heroFromVpnStatus, toConfig, friendlyError } from './utils.js';
 import { selectedConnection, rememberSession, displayedConnection } from './session.js';
 
@@ -234,7 +234,7 @@ export function setHero(s) {
   if (s !== 'on') setText('ip-readout', '—');
 
   applyHeroForSelection();
-  renderConnectionList();
+  updateConnectionListState();
 }
 
 export function applyHeroForSelection() {

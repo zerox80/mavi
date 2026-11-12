@@ -4,7 +4,7 @@ import { connect, applyStatus, disconnect, toggleConnection } from '../vpn.js';
 import { invoke } from '../api.js';
 
 vi.mock('../api.js', () => ({ invoke: vi.fn() }));
-vi.mock('../connections.js', () => ({ renderConnectionList: vi.fn() }));
+vi.mock('../connections.js', () => ({ updateConnectionListState: vi.fn() }));
 vi.mock('../toast.js', () => ({
   showToast: vi.fn(), hideToast: vi.fn(), showServiceOfflineHint: vi.fn(),
   daemonHintText: vi.fn(() => 'offline'),

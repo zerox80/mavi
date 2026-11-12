@@ -222,13 +222,19 @@ describe('connection list rendering and selection', () => {
     expect(document.getElementById('connection-list').textContent).toContain('No matches.');
   });
 
-  it('selects a connection, persists prefs, and rerenders', async () => {
+  it('selects a connection and updates the focused row after saving', async () => {
     const applyHeroForSelection = vi.fn();
     wireSidebarSearch({ openModal: vi.fn(), applyHeroForSelection });
+    renderConnectionList();
+    const [previous, row] = document.querySelectorAll('.conn-row');
+    row.focus();
 
     await selectConnection('two');
 
     expect(state.prefs.active_id).toBe('two');
+    expect(document.activeElement).toBe(row);
+    expect(row.classList.contains('selected')).toBe(true);
+    expect(previous.classList.contains('selected')).toBe(false);
     expect(savePrefs).toHaveBeenCalledOnce();
     expect(applyHeroForSelection).toHaveBeenCalledOnce();
   });

@@ -1,7 +1,7 @@
 import { beforeEach, expect, it, vi } from 'vitest';
 import { state } from '../state.js';
 import { applyStatus, applyHeroForSelection, connect } from '../vpn.js';
-import { selectConnection, wireSidebarSearch } from '../connections.js';
+import { renderConnectionList, selectConnection, wireSidebarSearch } from '../connections.js';
 import { invoke } from '../api.js';
 
 vi.mock('../api.js', () => ({ invoke: vi.fn() }));
@@ -24,7 +24,25 @@ beforeEach(() => {
     { id: 'b', label: 'Server B', endpoint: 'b.example:443', http2_framing: true },
   ];
   wireSidebarSearch({ openModal() {}, applyHeroForSelection });
+  renderConnectionList();
   invoke.mockImplementation(async command => command === 'vpn_status' ? connected : undefined);
+});
+
+it('keeps the edit button focused as VPN status updates the existing row', async () => {
+  const row = document.querySelector('.conn-row');
+  const edit = row.querySelector('.row-edit');
+  edit.focus();
+
+  await connect();
+  applyStatus(connected);
+
+  expect(document.activeElement).toBe(edit);
+  expect(row.classList.contains('active')).toBe(true);
+
+  applyStatus({ service_available: true, running: false, state: 'Stopped' });
+
+  expect(document.activeElement).toBe(edit);
+  expect(row.classList.contains('active')).toBe(false);
 });
 
 it('keeps the active server and transport when another profile is selected', async () => {
