@@ -27,14 +27,14 @@ export function renderConnectionList() {
 
   if (state.prefs.connections.length === 0) {
     list.innerHTML =
-      '<div class="conn-empty">No saved connections yet.<br/>Tap + ADD CONNECTION below.</div>';
+      '<div class="conn-empty">No saved connections yet.<br/>Add one to get started.</div>';
     return;
   }
 
   list.innerHTML = '';
   const header = document.createElement('div');
   header.className = 'group-header';
-  header.textContent = 'SAVED';
+  header.textContent = 'Connections';
   list.appendChild(header);
 
   if (filtered.length === 0) {
@@ -56,16 +56,34 @@ export function renderConnectionList() {
       (isSelected ? ' selected' : '') +
       (isActive ? ' active' : '') +
       (isConnecting ? ' connecting' : '');
+    row.tabIndex = 0;
+    row.setAttribute('role', 'button');
     row.addEventListener('click', () => selectConnection(c.id));
     row.addEventListener('dblclick', () => _openModal(c.id));
+    row.addEventListener('keydown', (e) => {
+      if (e.target !== row || (e.key !== 'Enter' && e.key !== ' ')) return;
+      e.preventDefault();
+      selectConnection(c.id);
+    });
     row.innerHTML = `
-      <div class="badge">${escapeHtml(initials(c.label))}</div>
+      <div class="avatar">${escapeHtml(initials(c.label))}</div>
       <div class="main">
         <div class="label">${escapeHtml(c.label)}</div>
         <div class="endpoint">${escapeHtml(c.endpoint)}</div>
       </div>
-      <div class="load"><span></span></div>
+      <span class="state-dot"></span>
+      <button class="icon-btn row-edit" type="button" title="Edit connection" aria-label="Edit connection">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M11.2 2.6l2.2 2.2-7.6 7.6-2.9.7.7-2.9 7.6-7.6z" />
+        </svg>
+      </button>
     `;
+    const edit = row.querySelector('.row-edit');
+    edit.addEventListener('click', (e) => {
+      e.stopPropagation();
+      _openModal(c.id);
+    });
+    edit.addEventListener('dblclick', (e) => e.stopPropagation());
     // Secondary: edit on right-click
     row.addEventListener('contextmenu', (e) => {
       e.preventDefault();

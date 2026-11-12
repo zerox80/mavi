@@ -5,10 +5,6 @@ describe('main startup workflow', () => {
     vi.resetModules();
     vi.clearAllMocks();
     document.body.innerHTML = `
-      <button class="tab active" data-tab="connect"></button>
-      <button class="tab" data-tab="activity"></button>
-      <div class="tab-panel active" data-panel="connect"></div>
-      <div class="tab-panel" data-panel="activity"></div>
       <input id="search" />
       <div id="modal-backdrop" class="visible"></div>
       <button id="modal-cancel"></button>
@@ -65,9 +61,7 @@ describe('main startup workflow', () => {
       toggleConnection,
       applyHeroForSelection: vi.fn(),
     }));
-    vi.doMock('../animations.js', () => ({
-      startCoreAnimation: vi.fn(),
-      startStatsAnimation: vi.fn(),
+    vi.doMock('../clock.js', () => ({
       startSessionClock: vi.fn(),
     }));
 
@@ -93,14 +87,6 @@ describe('main startup workflow', () => {
     listen.mock.calls[1][1]();
     expect(applyStatus).toHaveBeenCalledWith({ state: 'Connected' });
     expect(toggleConnection).toHaveBeenCalledOnce();
-
-    document.querySelector('.tab[data-tab="activity"]').click();
-    expect(document.querySelector('.tab[data-tab="activity"]').classList.contains('active')).toBe(
-      true
-    );
-    expect(
-      document.querySelector('.tab-panel[data-panel="activity"]').classList.contains('active')
-    ).toBe(true);
 
     const search = document.getElementById('search');
     const shortcut = new KeyboardEvent('keydown', {
@@ -157,9 +143,7 @@ describe('main startup workflow', () => {
       toggleConnection: vi.fn(),
       applyHeroForSelection: vi.fn(),
     }));
-    vi.doMock('../animations.js', () => ({
-      startCoreAnimation: vi.fn(),
-      startStatsAnimation: vi.fn(),
+    vi.doMock('../clock.js', () => ({
       startSessionClock: vi.fn(),
     }));
 

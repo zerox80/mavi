@@ -181,7 +181,7 @@ Diese Konfiguration verwenden? [J/n]:
 Die GUI verbindet sich automatisch mit dem laufenden Service.
 
 1. **Starten** - `mavi-vpn-gui.exe` doppelklicken
-2. **Verbindung anlegen** - Klick auf `+ ADD CONNECTION`
+2. **Verbindung anlegen** - Klick auf `Add connection`
 3. **Konfigurieren:**
    - Server Endpoint eintragen
    - Pre-shared Key eintragen oder Keycloak aktivieren
@@ -189,7 +189,7 @@ Die GUI verbindet sich automatisch mit dem laufenden Service.
    - optional ECH, CR/H3, HTTP/2 CONNECT-IP und VPN MTU setzen
    - HTTP/2 ist mit CR, HTTP/3 framing und ECH nicht kombinierbar
    - Verbindung speichern
-4. **Verbinden** - gespeicherte Verbindung auswaehlen und `CONNECT` klicken
+4. **Verbinden** - gespeicherte Verbindung auswaehlen und `Connect` klicken
 5. **System Tray** - Die GUI minimiert in den System Tray; Rechtsklick fuer Connect/Disconnect/Quit
 
 ---

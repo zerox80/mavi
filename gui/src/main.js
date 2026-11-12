@@ -10,11 +10,7 @@ import {
   toggleConnection,
   applyHeroForSelection,
 } from './vpn.js';
-import {
-  startCoreAnimation,
-  startStatsAnimation,
-  startSessionClock,
-} from './animations.js';
+import { startSessionClock } from './clock.js';
 import { showToast } from './toast.js';
 
 // ============================================================================
@@ -26,7 +22,6 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   state.prefsWriteBlocked = true;
 
-  wireTabs();
   wireSidebarSearch({ openModal, applyHeroForSelection });
   wireModal({ applyHeroForSelection });
   wireHero();
@@ -57,8 +52,6 @@ document.addEventListener('DOMContentLoaded', async () => {
   applyTheme(state.prefs.theme);
   renderConnectionList();
 
-  startCoreAnimation();
-  startStatsAnimation();
   startSessionClock();
 
   await refreshStatus();
@@ -79,29 +72,14 @@ document.addEventListener('DOMContentLoaded', async () => {
 });
 
 // ============================================================================
-// Tabs & Shortcuts (Kept in main for simplicity)
+// Shortcuts
 // ============================================================================
-
-function wireTabs() {
-  document.querySelectorAll('.tab').forEach((btn) => {
-    btn.addEventListener('click', () => {
-      const name = btn.dataset.tab;
-      document.querySelectorAll('.tab').forEach((t) => t.classList.toggle('active', t === btn));
-      document
-        .querySelectorAll('.tab-panel')
-        .forEach((p) => p.classList.toggle('active', p.dataset.panel === name));
-    });
-  });
-}
 
 function wireShortcuts() {
   document.addEventListener('keydown', (e) => {
     const mod = e.metaKey || e.ctrlKey;
     if (mod && (e.key === 'k' || e.key === 'K')) {
       e.preventDefault();
-      // Ensure CONNECT tab is active then focus search
-      const connectTab = document.querySelector('.tab[data-tab="connect"]');
-      if (connectTab) connectTab.click();
       const searchInput = $('search');
       if (searchInput) {
         searchInput.focus();
@@ -111,7 +89,6 @@ function wireShortcuts() {
     if (e.key === 'Escape') {
       const modal = $('modal-backdrop');
       if (modal && modal.classList.contains('visible')) {
-        // We need to import closeModal or just click the cancel button
         const cancelBtn = $('modal-cancel');
         if (cancelBtn) cancelBtn.click();
       }

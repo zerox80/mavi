@@ -1,35 +1,29 @@
+@file:Suppress("ktlint:standard:function-naming", "ktlint:standard:property-naming")
+
 package com.mavi.vpn.ui.screens
 
-import android.content.Context
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Lock
-import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
+import androidx.compose.material.icons.outlined.Link
+import androidx.compose.material.icons.outlined.Tune
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Switch
-import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -42,16 +36,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.mavi.vpn.VpnConnectionState
-import com.mavi.vpn.OAuthHelper
-import com.mavi.vpn.ui.components.MaviCore
-import com.mavi.vpn.ui.components.MaviCoreState
-import com.mavi.vpn.ui.components.MaviTextField
+import com.mavi.vpn.ui.components.MaviDivider
 import com.mavi.vpn.ui.theme.MaviTheme
 import com.mavi.vpn.viewmodel.VpnViewModel
 import kotlinx.coroutines.delay
@@ -68,7 +58,7 @@ fun VpnScreen(
     val context = LocalContext.current
     val connectionState by viewModel.connectionState.collectAsState()
     val isConnected = connectionState == VpnConnectionState.CONNECTED
-    
+
     val useKeycloak by viewModel.useKeycloak.collectAsState()
 
     // Mirror token changes persisted by MaviVpnService without owning refresh/logout decisions.
@@ -92,15 +82,17 @@ fun VpnScreen(
     var currentTab by remember { mutableStateOf("home") }
     val T = MaviTheme.colors
 
-    Box(
+    Column(
         modifier = Modifier
             .fillMaxSize()
             .background(T.bg)
+            .statusBarsPadding()
+            .imePadding(),
     ) {
         Box(
             modifier = Modifier
-                .fillMaxSize()
-                .padding(bottom = 88.dp)
+                .weight(1f)
+                .fillMaxWidth(),
         ) {
             when (currentTab) {
                 "home" ->
@@ -117,60 +109,80 @@ fun VpnScreen(
                 "config" -> ConfigView(
                     viewModel = viewModel,
                     context = context,
-                    isConnected = isConnected
+                    isConnected = isConnected,
                 )
             }
         }
 
-        // Bottom Tab Bar
-        Row(
+        Column(
             modifier = Modifier
-                .align(Alignment.BottomCenter)
                 .fillMaxWidth()
-                .height(88.dp)
-                .background(T.surface)
-                .border(width = 1.dp, color = T.line)
-                .padding(top = 12.dp, start = 20.dp, end = 20.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.Top
+                .background(T.surface),
         ) {
-            val tabs = listOf(
-                Pair("home", "Tunnel" to "◉"),
-                Pair("config", "Config" to "◎")
-            )
-            
-            tabs.forEach { (id, info) ->
-                val (label, glyph) = info
-                val isSelected = currentTab == id
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    modifier = Modifier
-                        .weight(1f)
-                        .clickable(
-                            interactionSource = remember {
-                                androidx.compose.foundation.interaction.MutableInteractionSource()
-                            },
-                            indication = null
-                        ) {
-                            currentTab = id
-                        }
-                ) {
-                    Text(
-                        text = glyph,
-                        fontSize = 18.sp,
-                        color = if (isSelected) T.accent else T.mute,
-                        fontFamily = MaterialTheme.typography.labelSmall.fontFamily
-                    )
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text(
-                        text = label.uppercase(),
-                        fontSize = 10.sp,
-                        letterSpacing = 1.sp,
-                        color = if (isSelected) T.accent else T.mute,
-                        fontFamily = MaterialTheme.typography.labelSmall.fontFamily
-                    )
-                }
+            MaviDivider()
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .navigationBarsPadding()
+                    .height(64.dp)
+                    .padding(horizontal = 12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                BottomTab(
+                    label = "Connection",
+                    icon = Icons.Outlined.Link,
+                    selected = currentTab == "home",
+                    onClick = { currentTab = "home" },
+                )
+                BottomTab(
+                    label = "Configuration",
+                    icon = Icons.Outlined.Tune,
+                    selected = currentTab == "config",
+                    onClick = { currentTab = "config" },
+                )
             }
         }
+    }
+}
+
+@Composable
+private fun RowScope.BottomTab(
+    label: String,
+    icon: ImageVector,
+    selected: Boolean,
+    onClick: () -> Unit,
+) {
+    val T = MaviTheme.colors
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = Modifier
+            .weight(1f)
+            .selectable(
+                selected = selected,
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null,
+                role = Role.Tab,
+                onClick = onClick,
+            ),
+    ) {
+        Box(
+            modifier = Modifier
+                .clip(CircleShape)
+                .background(if (selected) T.accentSoft else Color.Transparent)
+                .padding(horizontal = 18.dp, vertical = 4.dp),
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                tint = if (selected) T.accent else T.mute,
+                modifier = Modifier.size(20.dp),
+            )
+        }
+        Spacer(modifier = Modifier.height(4.dp))
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelSmall,
+            color = if (selected) T.ink else T.mute,
+        )
     }
 }

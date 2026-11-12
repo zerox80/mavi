@@ -22,14 +22,8 @@ describe('applyStatus', () => {
       <div id="ip-readout"></div>
       <div id="hero-title"></div>
       <div id="hero-subtitle"></div>
-      <div id="hero-node-id"></div>
-      <div id="hero-lat"></div>
-      <div id="title-state-label"></div>
       <div id="hero-status"></div>
-      <div id="core-label"></div>
-      <div id="net-node"></div>
       <div id="net-endpoint"></div>
-      <div id="net-ip"></div>
       <div id="net-service"></div>
       <div id="net-protocol"></div>
       <div id="net-transport"></div>
@@ -41,14 +35,14 @@ describe('applyStatus', () => {
     applyStatus({ service_available: false });
     expect(state.serviceAvailable).toBe(false);
     expect(document.getElementById('connect-btn').disabled).toBe(true);
-    expect(document.getElementById('net-service').textContent).toBe('OFFLINE');
+    expect(document.getElementById('net-service').textContent).toBe('Offline');
   });
 
   it('enables button when service is online and stopped', () => {
     applyStatus({ service_available: true, running: false, state: 'Stopped' });
     expect(state.serviceAvailable).toBe(true);
     expect(document.getElementById('connect-btn').disabled).toBe(false);
-    expect(document.getElementById('connect-btn').textContent).toBe('CONNECT');
+    expect(document.getElementById('connect-btn').textContent).toBe('Connect');
   });
 
   it('sets hero to on when connected', () => {
@@ -59,8 +53,21 @@ describe('applyStatus', () => {
       assigned_ip: '10.8.0.2',
     });
     expect(state.hero).toBe('on');
-    expect(document.getElementById('connect-btn').textContent).toBe('DISCONNECT');
+    expect(document.getElementById('connect-btn').textContent).toBe('Disconnect');
     expect(document.getElementById('ip-readout').textContent).toBe('10.8.0.2');
+    expect(document.getElementById('hero-status').textContent).toBe('Connected');
+    expect(document.getElementById('net-service').textContent).toBe('Running');
+  });
+
+  it('hides the tunnel IP while the tunnel is not up', () => {
+    applyStatus({
+      service_available: true,
+      running: false,
+      state: 'Starting',
+      assigned_ip: '10.8.0.2',
+    });
+    expect(state.hero).toBe('connecting');
+    expect(document.getElementById('ip-readout').textContent).toBe('—');
   });
 
   it('clears stale tunnel IP when a later status has no assigned IP', () => {
@@ -109,7 +116,7 @@ describe('applyStatus', () => {
   it('shows connecting and disconnecting status from backend state', () => {
     applyStatus({ service_available: true, running: false, state: 'Starting' });
     expect(state.hero).toBe('connecting');
-    expect(document.getElementById('connect-btn').textContent).toBe('CONNECTING...');
+    expect(document.getElementById('connect-btn').textContent).toBe('Connecting…');
 
     state.disconnecting = true;
     applyStatus({ service_available: true, running: false, state: 'Stopping' });
@@ -134,7 +141,7 @@ describe('applyStatus', () => {
     });
     expect(state.hero).toBe('connecting');
     expect(document.getElementById('connect-btn').disabled).toBe(false);
-    expect(document.getElementById('connect-btn').textContent).toBe('DISCONNECT');
+    expect(document.getElementById('connect-btn').textContent).toBe('Disconnect');
     const toast = document.getElementById('toast');
     // Non-error hint, and it must NOT surface the raw H3_NO_ERROR text.
     expect(toast.dataset.kind).toBe('hint');
@@ -152,7 +159,7 @@ describe('applyStatus', () => {
     expect(document.getElementById('connect-btn').title).toBe(
       'Select or add a saved connection first'
     );
-    expect(document.getElementById('hero-title').textContent).toBe('No node selected');
+    expect(document.getElementById('hero-title').textContent).toBe('No connection selected');
   });
 
   it('service offline clears disconnecting state', () => {

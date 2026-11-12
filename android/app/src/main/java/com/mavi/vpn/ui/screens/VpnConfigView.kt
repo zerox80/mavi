@@ -3,41 +3,37 @@
 package com.mavi.vpn.ui.screens
 
 import android.content.Context
-import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Lock
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Switch
-import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.mavi.vpn.OAuthHelper
+import com.mavi.vpn.ui.components.MaviCard
+import com.mavi.vpn.ui.components.MaviDivider
 import com.mavi.vpn.ui.components.MaviTextField
+import com.mavi.vpn.ui.components.PrimaryButton
+import com.mavi.vpn.ui.components.SectionLabel
+import com.mavi.vpn.ui.components.StatusPill
+import com.mavi.vpn.ui.components.StatusTone
+import com.mavi.vpn.ui.components.SwitchRow
+import com.mavi.vpn.ui.theme.MaviShapes
 import com.mavi.vpn.ui.theme.MaviTheme
 import com.mavi.vpn.viewmodel.VpnViewModel
 
@@ -72,40 +68,24 @@ fun ConfigView(
             Modifier
                 .fillMaxSize()
                 .verticalScroll(rememberScrollState())
-                .padding(top = 58.dp, bottom = 16.dp, start = 16.dp, end = 16.dp),
+                .padding(horizontal = 20.dp, vertical = 16.dp),
     ) {
-        Column(modifier = Modifier.padding(horizontal = 8.dp, vertical = 14.dp)) {
-            Text(
-                text = "/ CONFIGURATION",
-                fontFamily = MaterialTheme.typography.labelSmall.fontFamily,
-                fontSize = 10.sp,
-                color = T.mute,
-                letterSpacing = 1.5.sp,
-            )
-            Text(
-                text = "Tunnel Endpoint",
-                fontFamily = MaterialTheme.typography.displayLarge.fontFamily,
-                fontSize = 34.sp,
-                color = T.ink,
-                letterSpacing = (-0.8).sp,
-                modifier = Modifier.padding(top = 2.dp),
-            )
-        }
+        Text(
+            text = "Configuration",
+            style = MaterialTheme.typography.titleMedium,
+            color = T.ink,
+            modifier = Modifier.padding(start = 4.dp, top = 4.dp, bottom = 20.dp),
+        )
 
-        Spacer(modifier = Modifier.height(12.dp))
-
-        Card(
-            colors = CardDefaults.cardColors(containerColor = T.surface),
-            shape = RoundedCornerShape(14.dp),
-            border = BorderStroke(1.dp, T.line),
-            modifier = Modifier.fillMaxWidth(),
-        ) {
+        SectionLabel("Endpoint")
+        MaviCard {
             Column(modifier = Modifier.padding(16.dp)) {
                 MaviTextField(
                     value = serverIp,
                     onValueChange = { viewModel.serverIp.value = it },
                     label = "Server IP / Endpoint",
                     modifier = Modifier.fillMaxWidth(),
+                    mono = true,
                 )
                 Spacer(modifier = Modifier.height(12.dp))
                 MaviTextField(
@@ -113,6 +93,7 @@ fun ConfigView(
                     onValueChange = { viewModel.serverPort.value = it },
                     label = "Port",
                     modifier = Modifier.fillMaxWidth(),
+                    mono = true,
                 )
                 Spacer(modifier = Modifier.height(12.dp))
                 MaviTextField(
@@ -120,6 +101,7 @@ fun ConfigView(
                     onValueChange = { viewModel.certPin.value = it },
                     label = "Certificate PIN (SHA256 Hex)",
                     modifier = Modifier.fillMaxWidth(),
+                    mono = true,
                 )
                 Spacer(modifier = Modifier.height(12.dp))
                 MaviTextField(
@@ -128,57 +110,23 @@ fun ConfigView(
                     label = "ECH Config List (Hex) - Optional",
                     placeholder = "Enter to bypass SNI inspection",
                     modifier = Modifier.fillMaxWidth(),
+                    mono = true,
                 )
             }
         }
 
         Spacer(modifier = Modifier.height(24.dp))
 
-        Column(modifier = Modifier.padding(horizontal = 8.dp)) {
-            Text(
-                text = "/ AUTHENTICATION",
-                fontFamily = MaterialTheme.typography.labelSmall.fontFamily,
-                fontSize = 10.sp,
-                color = T.mute,
-                letterSpacing = 1.5.sp,
+        SectionLabel("Authentication")
+        MaviCard {
+            SwitchRow(
+                title = "Keycloak authentication",
+                description = "Sign in through your Keycloak server",
+                checked = useKeycloak,
+                onCheckedChange = { checked -> viewModel.setKeycloakEnabled(checked) },
             )
-        }
-
-        Spacer(modifier = Modifier.height(12.dp))
-
-        Card(
-            colors = CardDefaults.cardColors(containerColor = T.surface),
-            shape = RoundedCornerShape(14.dp),
-            border = BorderStroke(1.dp, T.line),
-            modifier = Modifier.fillMaxWidth(),
-        ) {
+            MaviDivider()
             Column(modifier = Modifier.padding(16.dp)) {
-                Row(
-                    modifier =
-                        Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 4.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Switch(
-                        checked = useKeycloak,
-                        onCheckedChange = { checked ->
-                            viewModel.setKeycloakEnabled(checked)
-                        },
-                        colors =
-                            SwitchDefaults.colors(
-                                checkedThumbColor = Color.White,
-                                checkedTrackColor = T.accent,
-                                uncheckedThumbColor = T.mute,
-                                uncheckedTrackColor = T.bg,
-                            ),
-                    )
-                    Spacer(modifier = Modifier.width(12.dp))
-                    Text("Keycloak Authentication", color = T.ink, fontSize = 15.sp)
-                }
-
-                Spacer(modifier = Modifier.height(12.dp))
-
                 if (useKeycloak) {
                     MaviTextField(
                         value = kcUrl,
@@ -187,14 +135,14 @@ fun ConfigView(
                         placeholder = "https://auth.example.com",
                         modifier = Modifier.fillMaxWidth(),
                     )
-                    Spacer(modifier = Modifier.height(8.dp))
+                    Spacer(modifier = Modifier.height(12.dp))
                     MaviTextField(
                         value = kcRealm,
                         onValueChange = { viewModel.kcRealm.value = it },
                         label = "Realm",
                         modifier = Modifier.fillMaxWidth(),
                     )
-                    Spacer(modifier = Modifier.height(8.dp))
+                    Spacer(modifier = Modifier.height(12.dp))
                     MaviTextField(
                         value = kcClientId,
                         onValueChange = { viewModel.kcClientId.value = it },
@@ -204,7 +152,10 @@ fun ConfigView(
 
                     Spacer(modifier = Modifier.height(16.dp))
 
-                    Button(
+                    PrimaryButton(
+                        text = "Login with Keycloak",
+                        icon = Icons.Default.Lock,
+                        modifier = Modifier.fillMaxWidth(),
                         onClick = {
                             val authConfigError = OAuthHelper.validateAuthConfiguration(kcUrl)
                             if (kcUrl.isBlank()) {
@@ -219,19 +170,7 @@ fun ConfigView(
                                 }
                             }
                         },
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = ButtonDefaults.buttonColors(containerColor = T.accent),
-                        shape = RoundedCornerShape(12.dp),
-                    ) {
-                        Icon(
-                            Icons.Default.Lock,
-                            contentDescription = null,
-                            modifier = Modifier.size(18.dp),
-                            tint = Color.White,
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text("Login with Keycloak", color = Color.White)
-                    }
+                    )
 
                     if (hasKeycloakSession || keycloakSessionInvalid) {
                         val statusText =
@@ -241,19 +180,13 @@ fun ConfigView(
                                 hasKeycloakRefreshToken -> "Access token will refresh"
                                 else -> "Login required"
                             }
-                        val statusColor =
-                            when {
-                                keycloakSessionInvalid -> T.warn
-                                keycloakTokenUsableLocally -> T.ok
-                                hasKeycloakRefreshToken -> T.ok
-                                else -> T.warn
-                            }
+                        val sessionUsable =
+                            !keycloakSessionInvalid && (keycloakTokenUsableLocally || hasKeycloakRefreshToken)
 
-                        Text(
-                            text = statusText,
-                            color = statusColor,
-                            fontSize = 12.sp,
-                            modifier = Modifier.padding(top = 8.dp),
+                        StatusPill(
+                            label = statusText,
+                            tone = if (sessionUsable) StatusTone.OK else StatusTone.PROGRESS,
+                            modifier = Modifier.padding(top = 12.dp),
                         )
                     }
                 } else {
@@ -273,9 +206,14 @@ fun ConfigView(
             Spacer(modifier = Modifier.height(16.dp))
             Text(
                 text = errorMessage,
-                color = T.warn,
-                fontSize = 13.sp,
-                modifier = Modifier.padding(horizontal = 8.dp),
+                color = T.danger,
+                style = MaterialTheme.typography.bodyMedium,
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(MaviShapes.control))
+                        .background(T.dangerSoft)
+                        .padding(horizontal = 14.dp, vertical = 12.dp),
             )
         }
     }

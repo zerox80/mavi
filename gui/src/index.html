@@ -8,209 +8,190 @@
   </head>
   <body>
     <div id="app">
-      <!-- ======================================================================
-       Brand titlebar (sits below the OS native frame)
-       =================================================================== -->
-      <div id="titlebar">
-        <button id="theme-toggle" title="Toggle theme">
-          <svg
-            id="theme-icon"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="1.8"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-          >
-            <circle cx="12" cy="12" r="4" />
-            <path
-              d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"
-            />
-          </svg>
-        </button>
+      <!-- Sidebar: brand, search, saved connections -->
+      <aside id="sidebar">
+        <header id="brand">
+          <img class="brand-logo" src="logo.png" alt="" />
+          <span class="brand-name">Mavi VPN</span>
+          <button id="theme-toggle" class="icon-btn" title="Toggle theme" aria-label="Toggle theme">
+            <svg
+              id="theme-icon"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.8"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <circle cx="12" cy="12" r="4" />
+              <path
+                d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"
+              />
+            </svg>
+          </button>
+        </header>
 
-        <div id="wordmark">
-          <span class="mark">mavi</span>
-          <span class="meta">v0.1 - PRIVATE TUNNEL</span>
-        </div>
-
-        <div id="title-state">
-          <span class="dot"></span>
-          <span id="title-state-label">NOT CONNECTED</span>
-        </div>
-      </div>
-
-      <!-- ======================================================================
-       Two-pane body
-       =================================================================== -->
-      <div id="body">
-        <!-- LEFT PANE -->
-        <aside id="sidebar">
-          <div id="tabs">
-            <button class="tab active" data-tab="connect">CONNECT</button>
-            <button class="tab" data-tab="network">NETWORK</button>
+        <div class="search-wrap">
+          <div class="search-box">
+            <svg viewBox="0 0 12 12" fill="none" aria-hidden="true">
+              <circle cx="5" cy="5" r="3.5" stroke="currentColor" stroke-width="1.2" />
+              <path d="M7.5 7.5l3 3" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" />
+            </svg>
+            <input id="search" type="text" placeholder="Search connections" aria-label="Search connections" />
+            <span class="kbd">Ctrl K</span>
           </div>
+        </div>
 
-          <!-- CONNECT tab -->
-          <div class="tab-panel active" data-panel="connect">
-            <div class="search-wrap">
-              <div class="search-box">
-                <svg viewBox="0 0 12 12" fill="none">
-                  <circle cx="5" cy="5" r="3.5" stroke="currentColor" stroke-width="1.2" />
-                  <path
-                    d="M7.5 7.5l3 3"
-                    stroke="currentColor"
-                    stroke-width="1.2"
-                    stroke-linecap="round"
-                  />
-                </svg>
-                <input id="search" type="text" placeholder="Filter saved connections" />
-                <span class="kbd">Ctrl+K</span>
+        <div id="connection-list"></div>
+
+        <footer class="sidebar-foot">
+          <button id="add-conn-btn" class="btn btn-secondary btn-block">
+            <svg viewBox="0 0 16 16" fill="none" aria-hidden="true">
+              <path d="M8 3.5v9M3.5 8h9" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
+            </svg>
+            Add connection
+          </button>
+        </footer>
+      </aside>
+
+      <!-- Main: status of the selected connection -->
+      <main id="main">
+        <div class="main-inner">
+          <header id="overview">
+            <div class="overview-text">
+              <div class="status-pill">
+                <span class="dot"></span>
+                <span id="hero-status">Not connected</span>
               </div>
+              <h1 id="hero-title">No connection selected</h1>
+              <p id="hero-subtitle">Add a connection to get started</p>
             </div>
+            <button id="connect-btn" class="btn btn-primary btn-lg" disabled>Connect</button>
+          </header>
 
-            <div id="connection-list"></div>
+          <section class="card">
+            <h2 class="card-title">Connection</h2>
+            <dl class="kv">
+              <div class="row">
+                <dt>Endpoint</dt>
+                <dd id="net-endpoint" class="mono">—</dd>
+              </div>
+              <div class="row">
+                <dt>Tunnel IP</dt>
+                <dd id="ip-readout" class="mono">—</dd>
+              </div>
+              <div class="row">
+                <dt>Session</dt>
+                <dd id="net-session" class="mono">00:00:00</dd>
+              </div>
+              <div class="row">
+                <dt>Service</dt>
+                <dd id="net-service">Offline</dd>
+              </div>
+            </dl>
+          </section>
 
-            <div class="add-conn-wrap">
-              <button id="add-conn-btn" class="add-conn-btn">+ ADD CONNECTION</button>
-            </div>
-          </div>
+          <section class="card">
+            <h2 class="card-title">Security</h2>
+            <dl class="kv">
+              <div class="row">
+                <dt>Protocol</dt>
+                <dd id="net-protocol">QUIC · TLS 1.3</dd>
+              </div>
+              <div class="row">
+                <dt>Transport</dt>
+                <dd id="net-transport">Raw QUIC</dd>
+              </div>
+              <div class="row">
+                <dt>Cipher</dt>
+                <dd>ChaCha20-Poly1305</dd>
+              </div>
+            </dl>
+          </section>
+        </div>
 
-          <!-- NETWORK tab -->
-          <div class="tab-panel" data-panel="network">
-            <div class="net-panel">
-              <div class="row"><span>NODE</span><span id="net-node">-</span></div>
-              <div class="row"><span>ENDPOINT</span><span id="net-endpoint">-</span></div>
-              <div class="row"><span>TUNNEL IP</span><span id="net-ip">-</span></div>
-              <hr class="panel-divider" />
-              <div class="row"><span>PROTOCOL</span><span id="net-protocol">QUIC - TLS 1.3</span></div>
-              <div class="row"><span>CIPHER</span><span>CHACHA20-POLY1305</span></div>
-              <div class="row"><span>TRANSPORT</span><span id="net-transport">RAW QUIC</span></div>
-              <hr class="panel-divider" />
-              <div class="row"><span>SESSION</span><span id="net-session">00:00:00</span></div>
-              <div class="row"><span>SERVICE</span><span id="net-service">OFFLINE</span></div>
-            </div>
-          </div>
-        </aside>
-
-        <!-- RIGHT PANE: hero -->
-        <main id="hero">
-          <span class="crosshair tl"></span>
-          <span class="crosshair tr"></span>
-          <span class="crosshair bl"></span>
-          <span class="crosshair br"></span>
-
-          <div id="hero-top">
-            <div class="col left">
-              <div>NODE / <span id="hero-node-id">-</span></div>
-              <div><span id="hero-lat">NO SELECTION</span></div>
-            </div>
-            <div class="col right">
-              <div>SESSION / <span id="hero-session">00:00:00</span></div>
-              <div>QUIC - CHACHA20-POLY1305</div>
-            </div>
-          </div>
-
-          <div id="hero-center">
-            <div id="core-wrap">
-              <svg id="core" viewBox="0 0 280 280"></svg>
-              <div id="core-label">TUNNEL</div>
-            </div>
-
-            <div id="hero-headline">
-              <div id="hero-status">// NOT CONNECTED</div>
-              <div id="hero-title">No node selected</div>
-              <div id="hero-subtitle">Add a saved connection to begin</div>
-            </div>
-
-            <button id="connect-btn" disabled>CONNECT</button>
-          </div>
-
-          <div id="hero-bottom">
-            <div class="stat down" title="Throughput measurement unavailable">
-              <span class="k">DOWN</span>
-              <span class="v" id="stat-down">0.0</span>
-              <span class="u">MB/S</span>
-            </div>
-            <div class="stat up" title="Throughput measurement unavailable">
-              <span class="k">UP</span>
-              <span class="v" id="stat-up">0.0</span>
-              <span class="u">MB/S</span>
-            </div>
-            <div class="ip-readout">IP - <span id="ip-readout">-</span></div>
-          </div>
-
-          <div id="toast"></div>
-        </main>
-      </div>
+        <div id="toast" role="status" aria-live="polite"></div>
+      </main>
     </div>
 
     <!-- Add / edit connection modal -->
     <div id="modal-backdrop">
-      <div id="modal">
+      <div id="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title">
         <h3 id="modal-title">New Connection</h3>
-        <div class="sub">// SAVED CONNECTION</div>
         <div class="form">
-          <div class="field">
-            <label for="m_label">Label</label>
-            <input type="text" id="m_label" placeholder="e.g. Home - Frankfurt" />
-          </div>
-          <div class="field">
-            <label for="m_endpoint">Endpoint</label>
-            <input type="text" id="m_endpoint" placeholder="vpn.example.com:4433" />
-          </div>
-          <div class="field" id="m-token-field">
-            <label for="m_token">Pre-shared Key</label>
-            <input type="password" id="m_token" placeholder="Pre-shared token" />
-          </div>
-          <div class="field">
-            <label for="m_cert_pin">Certificate PIN (SHA-256)</label>
-            <input type="text" id="m_cert_pin" placeholder="hex fingerprint, or old_pin,new_pin during rotation" title="Separate multiple pins with a comma during a certificate rotation, e.g. &quot;&lt;old_pin&gt;,&lt;new_pin&gt;&quot;." />
-          </div>
-          <div class="field">
-            <label for="m_ech_config">ECH Config (hex, optional)</label>
-            <input type="text" id="m_ech_config" placeholder="hex ECHConfigList" />
-          </div>
-          <div class="checkbox-field">
-            <input type="checkbox" id="m_cr_mode" />
-            <label for="m_cr_mode">Censorship-resistant mode</label>
-          </div>
-          <div class="checkbox-field">
-            <input type="checkbox" id="m_h3_framing" />
-            <label for="m_h3_framing">HTTP/3 framing</label>
-          </div>
-          <div class="checkbox-field">
-            <input type="checkbox" id="m_h2_framing" />
-            <label for="m_h2_framing">HTTP/2 CONNECT-IP over TCP (beta)</label>
-          </div>
-          <div class="field">
-            <label for="m_vpn_mtu">VPN MTU (1280-1360, default 1280)</label>
-            <input type="number" id="m_vpn_mtu" placeholder="1280" min="1280" max="1360" />
-          </div>
-          <hr class="panel-divider" />
-          <div class="checkbox-field">
-            <input type="checkbox" id="m_kc_auth" />
-            <label for="m_kc_auth">Keycloak authentication</label>
-          </div>
-          <div id="m-kc-fields" class="hidden">
+          <div class="form-section">
             <div class="field">
-              <label for="m_kc_url">Keycloak URL</label>
-              <input type="text" id="m_kc_url" placeholder="https://auth.example.com" />
+              <label for="m_label">Label</label>
+              <input type="text" id="m_label" placeholder="e.g. Frankfurt office" />
             </div>
             <div class="field">
-              <label for="m_kc_realm">Realm</label>
-              <input type="text" id="m_kc_realm" placeholder="mavi-vpn" />
+              <label for="m_endpoint">Endpoint</label>
+              <input type="text" id="m_endpoint" class="mono" placeholder="vpn.example.com:4433" />
+            </div>
+          </div>
+
+          <div class="form-section">
+            <h4 class="form-section-title">Authentication</h4>
+            <div class="checkbox-field">
+              <input type="checkbox" id="m_kc_auth" />
+              <label for="m_kc_auth">Keycloak authentication</label>
+            </div>
+            <div class="field" id="m-token-field">
+              <label for="m_token">Pre-shared key</label>
+              <input type="password" id="m_token" placeholder="Pre-shared token" />
+            </div>
+            <div id="m-kc-fields" class="hidden">
+              <div class="field">
+                <label for="m_kc_url">Keycloak URL</label>
+                <input type="text" id="m_kc_url" placeholder="https://auth.example.com" />
+              </div>
+              <div class="field">
+                <label for="m_kc_realm">Realm</label>
+                <input type="text" id="m_kc_realm" placeholder="mavi-vpn" />
+              </div>
+              <div class="field">
+                <label for="m_kc_client_id">Client ID</label>
+                <input type="text" id="m_kc_client_id" placeholder="mavi-client" />
+              </div>
+            </div>
+          </div>
+
+          <div class="form-section">
+            <h4 class="form-section-title">Security</h4>
+            <div class="field">
+              <label for="m_cert_pin">Certificate PIN (SHA-256)</label>
+              <input type="text" id="m_cert_pin" class="mono" placeholder="hex fingerprint, or old_pin,new_pin during rotation" title="Separate multiple pins with a comma during a certificate rotation, e.g. &quot;&lt;old_pin&gt;,&lt;new_pin&gt;&quot;." />
             </div>
             <div class="field">
-              <label for="m_kc_client_id">Client ID</label>
-              <input type="text" id="m_kc_client_id" placeholder="mavi-client" />
+              <label for="m_ech_config">ECH config (hex, optional)</label>
+              <input type="text" id="m_ech_config" class="mono" placeholder="hex ECHConfigList" />
+            </div>
+          </div>
+
+          <div class="form-section">
+            <h4 class="form-section-title">Transport</h4>
+            <div class="checkbox-field">
+              <input type="checkbox" id="m_cr_mode" />
+              <label for="m_cr_mode">Censorship-resistant mode</label>
+            </div>
+            <div class="checkbox-field">
+              <input type="checkbox" id="m_h3_framing" />
+              <label for="m_h3_framing">HTTP/3 framing</label>
+            </div>
+            <div class="checkbox-field">
+              <input type="checkbox" id="m_h2_framing" />
+              <label for="m_h2_framing">HTTP/2 CONNECT-IP over TCP (beta)</label>
+            </div>
+            <div class="field">
+              <label for="m_vpn_mtu">VPN MTU (1280-1360, default 1280)</label>
+              <input type="number" id="m_vpn_mtu" placeholder="1280" min="1280" max="1360" />
             </div>
           </div>
         </div>
         <div class="actions">
-          <button id="modal-delete" class="btn-danger hidden">Delete</button>
-          <button id="modal-cancel" class="btn-secondary">Cancel</button>
-          <button id="modal-save" class="btn-primary">Save</button>
+          <button id="modal-delete" class="btn btn-danger hidden">Delete</button>
+          <button id="modal-cancel" class="btn btn-secondary">Cancel</button>
+          <button id="modal-save" class="btn btn-primary">Save</button>
         </div>
       </div>
     </div>

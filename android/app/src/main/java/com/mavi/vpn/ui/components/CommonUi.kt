@@ -4,14 +4,20 @@ import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.drawable.BitmapDrawable
 import android.graphics.drawable.Drawable
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextFieldColors
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
+import com.mavi.vpn.ui.theme.MaviColors
+import com.mavi.vpn.ui.theme.MaviMono
+import com.mavi.vpn.ui.theme.MaviShapes
+import com.mavi.vpn.ui.theme.MaviTheme
 
 @Composable
 fun MaviTextField(
@@ -23,23 +29,38 @@ fun MaviTextField(
     singleLine: Boolean = true,
     visualTransformation: androidx.compose.ui.text.input.VisualTransformation =
         androidx.compose.ui.text.input.VisualTransformation.None,
+    mono: Boolean = false,
 ) {
+    val T = MaviTheme.colors
     OutlinedTextField(
         value = value,
         onValueChange = onValueChange,
-        label = { Text(label, color = Color.Gray) },
-        placeholder = { if (placeholder.isNotEmpty()) Text(placeholder, color = Color.Gray) },
+        label = { Text(label) },
+        placeholder = { if (placeholder.isNotEmpty()) Text(placeholder) },
         modifier = modifier,
         singleLine = singleLine,
         visualTransformation = visualTransformation,
-        colors = OutlinedTextFieldDefaults.colors(
-            focusedBorderColor = Color(0xFF007AFF),
-            unfocusedBorderColor = Color.DarkGray,
-            focusedTextColor = Color.White,
-            unfocusedTextColor = Color.White,
-        ),
+        shape = RoundedCornerShape(MaviShapes.control),
+        textStyle = if (mono) LocalTextStyle.current.copy(fontFamily = MaviMono) else LocalTextStyle.current,
+        colors = maviTextFieldColors(T),
     )
 }
+
+@Composable
+fun maviTextFieldColors(T: MaviColors = MaviTheme.colors): TextFieldColors =
+    OutlinedTextFieldDefaults.colors(
+        focusedBorderColor = T.accent,
+        unfocusedBorderColor = T.lineStrong,
+        focusedTextColor = T.ink,
+        unfocusedTextColor = T.ink,
+        focusedLabelColor = T.accent,
+        unfocusedLabelColor = T.mute,
+        focusedPlaceholderColor = T.mute,
+        unfocusedPlaceholderColor = T.mute,
+        focusedContainerColor = T.surface,
+        unfocusedContainerColor = T.surface,
+        cursorColor = T.accent,
+    )
 
 fun drawableToBitmap(drawable: Drawable): Bitmap? {
     return try {
