@@ -1,0 +1,81 @@
+services:
+  vpn-server:
+    environment:
+      VPN_KEYCLOAK_ENABLED: "true"
+      VPN_KEYCLOAK_URL: ${VPN_KEYCLOAK_URL:?VPN_KEYCLOAK_URL is required when the panel is enabled}
+      VPN_KEYCLOAK_REALM: ${VPN_KEYCLOAK_REALM:-mavi-vpn}
+      VPN_KEYCLOAK_CLIENT_ID: ${VPN_KEYCLOAK_CLIENT_ID:-mavi-client}
+      VPN_KEYCLOAK_REQUIRED_ROLE: ${VPN_KEYCLOAK_REQUIRED_ROLE:-vpn-user}
+      VPN_KEYCLOAK_REQUIRED_SCOPE: ${VPN_KEYCLOAK_REQUIRED_SCOPE:-}
+
+  panel-db:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: mavi_panel
+      POSTGRES_USER: mavi_panel
+      POSTGRES_PASSWORD: ${MAVI_PANEL_DB_PASSWORD:?MAVI_PANEL_DB_PASSWORD is required}
+    volumes:
+      - panel-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready --username=mavi_panel --dbname=mavi_panel --quiet"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 10s
+    security_opt:
+      - no-new-privileges:true
+
+  panel:
+    build:
+      context: ..
+      dockerfile: panel/Dockerfile
+    restart: unless-stopped
+    user: "${MAVI_PANEL_USER:-1000:1000}"
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    # Loopback-only HTTP for a host Nginx/Certbot reverse proxy. Traefik
+    # deployments route through the Docker network instead; binding loopback
+    # additionally is harmless there.
+    ports:
+      - "127.0.0.1:18081:8081"
+    environment:
+      MAVI_PANEL_DATABASE_URL: postgresql://mavi_panel:${MAVI_PANEL_DB_PASSWORD}@panel-db:5432/mavi_panel
+      MAVI_PANEL_PUBLIC_URL: https://panel.${DOMAIN_NAME}
+      MAVI_PANEL_KEYCLOAK_URL: ${VPN_KEYCLOAK_URL}
+      MAVI_PANEL_KEYCLOAK_REALM: ${VPN_KEYCLOAK_REALM:-mavi-vpn}
+      MAVI_PANEL_CLIENT_ID: mavi-panel
+      MAVI_PANEL_CLIENT_SECRET: ${MAVI_PANEL_CLIENT_SECRET:-}
+      MAVI_PANEL_VPN_CLIENT_ID: ${VPN_KEYCLOAK_CLIENT_ID:-mavi-client}
+      MAVI_PANEL_PROXY_TOKEN: ${MAVI_PANEL_PROXY_TOKEN:-}
+      MAVI_PANEL_VPN_ENDPOINT: ${MAVI_PANEL_VPN_ENDPOINT}
+      MAVI_PANEL_CERT_PIN_FILE: /server-data/cert_pin.txt
+      MAVI_PANEL_ECH_CONFIG_FILE: /server-data/ech_config_hex.txt
+      MAVI_PANEL_TRANSPORT: ${MAVI_PANEL_TRANSPORT:-http3_censorship_resistant}
+      MAVI_PANEL_BIND: 0.0.0.0:8081
+      MAVI_PANEL_INSECURE_HTTP: "false"
+    volumes:
+      - ./data:/server-data:ro
+    depends_on:
+      panel-db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl --fail --silent --show-error --max-time 5 http://127.0.0.1:8081/health/ready >/dev/null"]
+      interval: 10s
+      timeout: 7s
+      retries: 12
+      start_period: 20s
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.panel.rule=Host(`panel.${DOMAIN_NAME}`)"
+      - "traefik.http.routers.panel.entrypoints=${TRAEFIK_ROUTER_ENTRYPOINTS:-web}"
+      - "traefik.http.routers.panel.tls=${TRAEFIK_TLS_ENABLED:-false}"
+      - "traefik.http.routers.panel.tls.certresolver=${TRAEFIK_ACME_RESOLVER:-myresolver}"
+      - "traefik.http.routers.panel.middlewares=mavi-panel-forwarded"
+      - "traefik.http.middlewares.mavi-panel-forwarded.headers.customrequestheaders.X-Mavi-Proxy-Token=${MAVI_PANEL_PROXY_TOKEN:-}"
+      - "traefik.http.services.panel.loadbalancer.server.port=8081"
+
+volumes:
+  panel-db-data:

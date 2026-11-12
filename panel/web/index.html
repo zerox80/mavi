@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Mavi VPN Panel</title>
+  <link rel="stylesheet" href="/styles.css">
+  <script src="/app.js" defer></script>
+</head>
+<body>
+  <header class="site-header">
+    <a class="brand" href="/" aria-label="Mavi panel home">Mavi <span>VPN Panel</span></a>
+    <div id="account-area" class="account-area" hidden>
+      <span id="account-name"></span>
+      <button id="logout-button" class="button secondary small" type="button">Sign out</button>
+    </div>
+  </header>
+  <main class="page-shell">
+    <p id="global-message" class="message" role="status" aria-live="polite" hidden></p>
+
+    <section id="login-view" class="login-card card" hidden>
+      <p class="eyebrow">Device management</p>
+      <h1>Connect your devices to Mavi VPN</h1>
+      <p>Sign in with your organization account to create an enrollment link. Links expire after 15 minutes and can be redeemed once.</p>
+      <a class="button primary" href="/auth/login">Sign in with Keycloak</a>
+    </section>
+
+    <div id="dashboard-view" hidden>
+      <section class="card server-card" aria-labelledby="server-heading">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">Configuration</p>
+            <h1 id="server-heading">VPN server</h1>
+          </div>
+          <span class="status imported">Keycloak</span>
+        </div>
+        <dl class="server-grid">
+          <div><dt>Name</dt><dd id="server-name">Loading…</dd></div>
+          <div><dt>Endpoint</dt><dd id="server-endpoint">—</dd></div>
+          <div><dt>Transport</dt><dd id="server-transport">—</dd></div>
+          <div><dt>VPN MTU</dt><dd id="server-mtu">1280</dd></div>
+          <div><dt>Realm</dt><dd id="server-realm">—</dd></div>
+          <div><dt>Client</dt><dd id="server-client">—</dd></div>
+        </dl>
+        <details class="public-details">
+          <summary>Public enrollment parameters</summary>
+          <dl>
+            <div><dt>Keycloak URL</dt><dd><code id="server-keycloak"></code></dd></div>
+            <div><dt>Certificate PIN</dt><dd><code id="server-pin" class="breakable"></code></dd></div>
+            <div><dt>ECH configuration</dt><dd><code id="server-ech" class="breakable"></code></dd></div>
+          </dl>
+        </details>
+      </section>
+
+      <div class="dashboard-grid">
+        <section class="card" aria-labelledby="add-heading">
+          <p class="eyebrow">New enrollment</p>
+          <h2 id="add-heading">Add a device</h2>
+          <form id="device-form" class="device-form">
+            <label for="device-label">Device label</label>
+            <input id="device-label" name="label" type="text" maxlength="80" autocomplete="off" placeholder="For example, Alice’s laptop" required>
+            <label for="device-platform">Platform</label>
+            <select id="device-platform" name="platform" required>
+              <option value="windows">Windows</option>
+              <option value="linux">Linux</option>
+              <option value="android">Android</option>
+            </select>
+            <button id="create-button" class="button primary" type="submit">Create enrollment</button>
+          </form>
+          <p class="hint">The enrollment secret is shown only in this response. It cannot be recovered from the device list.</p>
+        </section>
+
+        <section id="enrollment-result" class="card enrollment-card" aria-labelledby="enrollment-heading" hidden>
+          <p class="eyebrow">Ready to import</p>
+          <h2 id="enrollment-heading">Scan with Mavi</h2>
+          <img id="qr-image" class="qr-image" width="256" height="256" alt="QR code for the one-time enrollment URL">
+          <label for="enrollment-link">One-time enrollment link</label>
+          <div class="copy-row">
+            <input id="enrollment-link" type="text" readonly>
+            <button id="copy-button" class="button secondary" type="button">Copy</button>
+          </div>
+          <a id="open-mavi" class="button primary" href="#">Open in Mavi</a>
+          <p class="hint">The link expires after 15 minutes and stops working after a successful import.</p>
+        </section>
+      </div>
+
+      <section class="card" aria-labelledby="devices-heading">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">Inventory</p>
+            <h2 id="devices-heading">Devices</h2>
+          </div>
+          <button id="refresh-button" class="button secondary small" type="button">Refresh</button>
+        </div>
+        <p id="device-message" class="message" role="status" aria-live="polite" hidden></p>
+        <div id="device-list" class="device-list"></div>
+        <p id="empty-devices" class="empty-state" hidden>No devices have been added.</p>
+        <p class="hint">Deleting a device removes its panel inventory and unused enrollment ticket. It does not revoke VPN access or disconnect an existing VPN session.</p>
+      </section>
+    </div>
+  </main>
+  <footer>Mavi VPN · Enrollment profiles contain no access or refresh tokens.</footer>
+</body>
+</html>

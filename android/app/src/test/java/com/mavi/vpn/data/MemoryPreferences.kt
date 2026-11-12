@@ -14,7 +14,7 @@ internal class MemoryPreferences {
             arrayOf(SharedPreferences::class.java),
         ) { _, method, args ->
             when (method.name) {
-                "getString", "getBoolean" -> values[args[0]] ?: args[1]
+                "getString", "getBoolean", "getInt" -> values[args[0]] ?: args[1]
                 "edit" -> editor()
                 else -> error("Unexpected preference call: ${method.name}")
             }
@@ -27,7 +27,7 @@ internal class MemoryPreferences {
             arrayOf(SharedPreferences.Editor::class.java),
         ) { proxy, method, args ->
             when (method.name) {
-                "putString", "putBoolean" -> {
+                "putString", "putBoolean", "putInt" -> {
                     changes[args[0] as String] = args[1]
                     proxy
                 }

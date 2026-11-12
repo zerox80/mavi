@@ -1,0 +1,129 @@
+.add-conn-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.add-conn-actions #add-conn-btn {
+  flex: 1;
+  min-width: 0;
+}
+
+.add-conn-actions #enroll-conn-btn {
+  flex: 0 0 82px;
+}
+
+#enroll-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.35);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  z-index: 110;
+}
+
+#enroll-backdrop.visible {
+  display: flex;
+}
+
+#enroll-modal {
+  width: 440px;
+  max-height: 85vh;
+  background: var(--elevated);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 22px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+#enroll-modal h3 {
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: 24px;
+  letter-spacing: -0.5px;
+  margin-bottom: 4px;
+}
+
+#enroll-modal .sub {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 1.5px;
+  color: var(--mute);
+  margin-bottom: 16px;
+}
+
+#enroll-modal .form {
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+#enroll-modal .actions {
+  margin-top: 16px;
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+}
+
+.enroll-help {
+  color: var(--mute);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.enroll-summary {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 4px 12px;
+  margin-bottom: 12px;
+}
+
+.enroll-summary > div {
+  padding: 9px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.enroll-summary > div:last-child {
+  border-bottom: none;
+}
+
+.enroll-summary span,
+.enroll-summary strong {
+  display: block;
+  overflow-wrap: anywhere;
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+.enroll-summary span {
+  color: var(--mute);
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: 1px;
+  margin-bottom: 3px;
+}
+
+.enroll-summary strong {
+  color: var(--ink);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.enroll-error {
+  border: 1px solid var(--warn);
+  border-radius: 8px;
+  color: var(--warn);
+  font-size: 12px;
+  line-height: 1.4;
+  margin-top: 12px;
+  padding: 9px 11px;
+  overflow-wrap: anywhere;
+}
+
+#enroll-modal button:disabled {
+  cursor: wait;
+  opacity: 0.6;
+}

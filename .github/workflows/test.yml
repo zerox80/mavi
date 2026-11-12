@@ -51,6 +51,8 @@ jobs:
         run: cargo test -p mavivpn --verbose
       - name: Test backend
         run: cargo test -p mavi-vpn --verbose
+      - name: Test web panel
+        run: cargo test -p mavi-panel --verbose
       - name: Test linux client
         run: cargo test -p linux-vpn --verbose
       - name: Test quic-tester
@@ -124,7 +126,7 @@ jobs:
         run: |
           mkdir -p target/coverage
 
-          ALL_RUST_PACKAGES="-p shared -p mavivpn -p mavi-vpn -p linux-vpn -p quic-tester -p mavi-vpn-gui"
+          ALL_RUST_PACKAGES="-p shared -p mavivpn -p mavi-vpn -p linux-vpn -p quic-tester -p mavi-vpn-gui -p mavi-panel"
 
           cargo llvm-cov --all-features -p shared --summary-only
           cargo llvm-cov --all-features -p mavivpn --summary-only

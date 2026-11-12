@@ -10,6 +10,12 @@
 !shared/Cargo.toml
 !shared/src/
 !shared/src/**
+!panel/
+!panel/Cargo.toml
+!panel/src/
+!panel/src/**
+!panel/web/
+!panel/web/**
 !linux/
 !linux/Cargo.toml
 !linux/src/

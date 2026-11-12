@@ -1,5 +1,8 @@
+mod enrollment;
 mod keycloak;
 mod lifecycle;
+
+pub(crate) use enrollment::{import_enrollment, redeem_enrollment};
 
 use crate::ipc::send_ipc_request;
 use crate::storage::{load_config_from_dir, load_prefs_from_dir, save_config_to_dir};
