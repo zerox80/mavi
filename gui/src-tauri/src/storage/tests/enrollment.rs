@@ -100,7 +100,9 @@ fn invalid_frontend_profile_cannot_replace_saved_connections() {
     let mut profile = enrollment_profile();
     profile.keycloak.url = "https://user@auth.example.com".into();
 
-    let error = import_enrollment_to_dir_with_store(dir.path(), profile, &store).unwrap_err();
+    let error = import_enrollment_to_dir_with_store(dir.path(), profile, &store)
+        .err()
+        .expect("enrollment must reject unreadable preferences");
 
     assert!(!error.is_empty());
     assert!(!dir.path().join("prefs.json").exists());

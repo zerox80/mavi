@@ -15,9 +15,9 @@ from urllib.parse import quote, urlencode
 from urllib.request import Request, build_opener
 
 try:
-    from .config import ConfigurationError, load_env, parse_bool, validate_domain, validate_username
+    from .config import ConfigurationError, generate_secret, load_env, parse_bool, save_env, validate_domain, validate_username
 except ImportError:  # Direct execution from the repository checkout.
-    from config import ConfigurationError, load_env, parse_bool, validate_domain, validate_username
+    from config import ConfigurationError, generate_secret, load_env, parse_bool, save_env, validate_domain, validate_username
 
 PANEL_CLIENT_ID = "mavi-panel"
 PANEL_ROLES = ("panel-admin", "panel-user", "vpn-user")
@@ -32,12 +32,6 @@ class AdminResult:
     username: str
     created: bool
     temporary_password: str = ""
-
-
-@dataclass(frozen=True)
-class BootstrapResult:
-    client_secret: str
-    admin: AdminResult | None = None
 
 
 class KeycloakAdmin:
@@ -212,17 +206,18 @@ class KeycloakAdmin:
             existing = next(client for client in matches if client.get("clientId") == PANEL_CLIENT_ID)
         else:
             client_path = f"{base}/{existing['id']}"
-            current = self._request("GET", f"{client_path}/secret", allow_not_found=True) or {}
-            current_secret = current.get("value", "")
-            if current_secret:
-                if current_secret != secret and not adopt_existing_secret:
-                    raise KeycloakError(
-                        "MAVI_PANEL_CLIENT_SECRET does not match the existing mavi-panel client. "
-                        "No secret was changed; update backend/.env with the existing client secret."
-                    )
-                effective_secret = current_secret
-                desired.pop("secret", None)
+            current = self._request("GET", f"{client_path}/client-secret")
+            current_secret = current.get("value") if isinstance(current, dict) else None
+            if not isinstance(current_secret, str) or not current_secret:
+                raise KeycloakError("The existing mavi-panel client did not return a usable client secret.")
+            if current_secret != secret and not adopt_existing_secret:
+                raise KeycloakError(
+                    "MAVI_PANEL_CLIENT_SECRET does not match the existing mavi-panel client. "
+                    "No secret was changed; update backend/.env with the existing client secret."
+                )
+            effective_secret = current_secret
             representation = {**existing, **desired}
+            representation.pop("secret", None)
             representation["attributes"] = {**existing.get("attributes", {}), **desired["attributes"]}
             self._request("PUT", client_path, representation)
         client_id = existing["id"]
@@ -284,23 +279,22 @@ class KeycloakAdmin:
 
 
 def bootstrap_panel(
-    values: Mapping[str, str],
+    values: dict[str, str],
+    env_path: Path,
     *,
     create_admin: bool = False,
     admin_username: str = "panel-admin",
     admin_email: str = "",
-    adopt_existing_secret: bool = False,
     wait_timeout: int = 600,
     opener: Any = None,
     sleep: Callable[[float], None] = time.sleep,
     monotonic: Callable[[], float] = time.monotonic,
-) -> BootstrapResult:
+) -> AdminResult | None:
     domain = validate_domain(values.get("DOMAIN_NAME", ""))
     base_url = values.get("VPN_KEYCLOAK_URL") or f"https://auth.{domain}"
     realm = values.get("VPN_KEYCLOAK_REALM", "mavi-vpn")
-    client_secret = values.get("MAVI_PANEL_CLIENT_SECRET", "")
-    if not client_secret:
-        raise ConfigurationError("MAVI_PANEL_CLIENT_SECRET is missing from backend/.env.")
+    configured_secret = values.get("MAVI_PANEL_CLIENT_SECRET")
+    client_secret = configured_secret or generate_secret()
     api = KeycloakAdmin(
         base_url,
         realm,
@@ -314,7 +308,9 @@ def bootstrap_panel(
         raise ConfigurationError("KEYCLOAK_ADMIN_PASS is missing from backend/.env.")
     api.wait_until_ready(wait_timeout)
     roles = [api.ensure_role(name) for name in PANEL_ROLES]
-    _, effective_secret = api.ensure_client(f"https://panel.{domain}", client_secret, adopt_existing_secret)
+    _, effective_secret = api.ensure_client(
+        f"https://panel.{domain}", client_secret, adopt_existing_secret=not configured_secret
+    )
     api.ensure_default_roles(roles)
     admin = None
     if create_admin:
@@ -323,7 +319,13 @@ def bootstrap_panel(
             admin_email.strip(),
             lambda: secrets.token_urlsafe(18),
         )
-    return BootstrapResult(effective_secret, admin)
+    if not configured_secret:
+        # Persist only the authoritative secret. If bootstrap fails before
+        # this point, a retry can still adopt the secret from Keycloak.
+        updated = {**values, "MAVI_PANEL_CLIENT_SECRET": effective_secret}
+        save_env(env_path, updated)
+        values.update(updated)
+    return admin
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -340,8 +342,9 @@ def main(argv: list[str] | None = None) -> int:
             raise ConfigurationError("The web panel is not enabled in this .env file.")
         if args.create_admin and not args.admin_email.strip():
             raise ConfigurationError("--admin-email is required with --create-admin.")
-        result = bootstrap_panel(
+        admin = bootstrap_panel(
             values,
+            args.env_file,
             create_admin=args.create_admin,
             admin_username=args.admin_username,
             admin_email=args.admin_email,
@@ -351,11 +354,11 @@ def main(argv: list[str] | None = None) -> int:
         print(f"Error: {exc}", file=sys.stderr)
         return 1
     print("The panel client, realm roles, and default roles are ready.")
-    if result.admin and result.admin.created:
-        print(f"Created panel administrator: {result.admin.username}")
-        print(f"Temporary password: {result.admin.temporary_password}")
-    elif result.admin:
-        print(f"Panel administrator already exists; password and existing roles were preserved: {result.admin.username}")
+    if admin and admin.created:
+        print(f"Created panel administrator: {admin.username}")
+        print(f"Temporary password: {admin.temporary_password}")
+    elif admin:
+        print(f"Panel administrator already exists; password and existing roles were preserved: {admin.username}")
     return 0
 
 

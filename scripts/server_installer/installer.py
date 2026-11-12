@@ -25,6 +25,7 @@ try:
         load_env,
         plan_from_existing,
         save_env,
+        uses_traefik_profile,
         validate_domain,
         validate_username,
     )
@@ -45,6 +46,7 @@ except ImportError:  # Direct execution from the repository checkout.
         load_env,
         plan_from_existing,
         save_env,
+        uses_traefik_profile,
         validate_domain,
         validate_username,
     )
@@ -202,7 +204,7 @@ def install_docker_with_consent(non_interactive: bool) -> bool:
     return True
 
 
-def install_nginx_with_consent(plan: InstallPlan, non_interactive: bool) -> bool:
+def install_nginx_with_consent(plan: InstallPlan, non_interactive: bool, proxy_token: str = "") -> bool:
     """Install and configure Nginx/Certbot after showing what will run."""
     packages = nginx_package_names()
     print("The host Nginx proxy requires these system packages:")
@@ -216,6 +218,7 @@ def install_nginx_with_consent(plan: InstallPlan, non_interactive: bool) -> bool
             plan.uses_panel,
             plan.acme_email,
             install_packages=True,
+            proxy_token=proxy_token,
         )
     except (NginxSetupError, OSError) as exc:
         print(f"Error: Nginx setup failed: {exc}", file=sys.stderr)
@@ -242,32 +245,29 @@ def prepare_private_paths(backend: Path, standalone: bool) -> None:
         os.chmod(acme, 0o600)
 
 
-def start_stack(backend: Path, plan: InstallPlan, values: dict[str, str], generated: set[str]) -> int:
+def start_stack(backend: Path, plan: InstallPlan, values: dict[str, str]) -> int:
     if plan.uses_keycloak:
         services = ["vpn-server", "keycloak-db", "keycloak"]
-        if plan.proxy == PROXY_TRAEFIK:
+        if plan.proxy == PROXY_TRAEFIK or uses_traefik_profile(values):
             services.append("traefik")
         run(["docker", "compose", "up", "-d", "--build", *services], backend)
     else:
         run(["docker", "compose", "up", "-d", "--build", "vpn-server"], backend)
     if not plan.uses_panel:
         return 0
-    result = bootstrap_panel(
+    admin = bootstrap_panel(
         values,
+        backend / ".env",
         create_admin=plan.create_admin,
         admin_username=plan.admin_username,
         admin_email=plan.admin_email,
-        adopt_existing_secret="MAVI_PANEL_CLIENT_SECRET" in generated,
     )
-    if result.client_secret != values["MAVI_PANEL_CLIENT_SECRET"]:
-        values["MAVI_PANEL_CLIENT_SECRET"] = result.client_secret
-        save_env(backend / ".env", values)
-    if result.admin and result.admin.created:
-        print(f"Created panel administrator: {result.admin.username}")
-        print(f"Temporary password: {result.admin.temporary_password}")
+    if admin and admin.created:
+        print(f"Created panel administrator: {admin.username}")
+        print(f"Temporary password: {admin.temporary_password}")
         print("The password must be changed at the first login; it is not stored by the installer.")
-    elif result.admin:
-        print(f"Panel administrator already exists; password and existing roles were preserved: {result.admin.username}")
+    elif admin:
+        print(f"Panel administrator already exists; password and existing roles were preserved: {admin.username}")
     run(["docker", "compose", "up", "-d", "--build", "panel"], backend)
     return 0
 
@@ -314,7 +314,7 @@ def main(argv: list[str] | None = None) -> int:
             return 1 if report.failures else 0
         if report.failures:
             docker_failure = all(check.name in {"docker", "compose"} for check in report.failures)
-            if not docker_failure or not install_docker_with_consent(args.non_interactive):
+            if args.no_start or not docker_failure or not install_docker_with_consent(args.non_interactive):
                 print("Preflight failed. No configuration or containers were changed.", file=sys.stderr)
                 return 1
             report = collect_preflight(plan, values, backend)
@@ -338,12 +338,12 @@ def main(argv: list[str] | None = None) -> int:
                 print(f"Backed up the previous environment to {result.backup.name} with mode 0600.")
         else:
             print(f"Existing {env_path} is unchanged.")
-        if plan.proxy == PROXY_NGINX and plan.uses_keycloak:
-            if not install_nginx_with_consent(plan, args.non_interactive):
-                print("Nginx setup failed. The .env file was written; fix the problem and rerun the installer.", file=sys.stderr)
-                return 1
         if not args.no_start:
-            start_stack(backend, plan, values, generated)
+            if plan.proxy == PROXY_NGINX and plan.uses_keycloak:
+                if not install_nginx_with_consent(plan, args.non_interactive, values.get("MAVI_PANEL_PROXY_TOKEN", "")):
+                    print("Nginx setup failed. The .env file was written; fix the problem and rerun the installer.", file=sys.stderr)
+                    return 1
+            start_stack(backend, plan, values)
         print("\nInstallation finished.")
         print("Restart later with: cd backend && docker compose up -d")
         if plan.uses_panel and not args.no_start:

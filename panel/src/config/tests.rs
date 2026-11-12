@@ -107,8 +107,26 @@ fn generated_profile_uses_the_shared_schema_and_mtu() {
     profile.validate().unwrap();
     assert_eq!(profile.schema, ENROLLMENT_SCHEMA_V1);
     assert_eq!(profile.vpn_mtu, 1280);
-    assert_eq!(profile.keycloak.client_id, "mavi-panel");
+    assert_eq!(config.keycloak.client_id, "mavi-panel");
+    assert_eq!(profile.keycloak.client_id, "mavi-client");
     assert!(profile.ech_config.is_none());
+}
+
+#[test]
+fn enrollment_uses_the_configured_vpn_client_id() {
+    let mut configured = values();
+    configured.insert("MAVI_PANEL_VPN_CLIENT_ID", "custom-vpn-client".into());
+    let config = load(configured).unwrap();
+    let profile = config
+        .profile_from_files(
+            "device-1".into(),
+            "Work laptop".into(),
+            "ab".repeat(32),
+            None,
+        )
+        .unwrap();
+    assert_eq!(profile.keycloak.client_id, "custom-vpn-client");
+    assert_eq!(config.keycloak.client_id, "mavi-panel");
 }
 
 #[test]

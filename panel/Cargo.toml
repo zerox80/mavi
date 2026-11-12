@@ -26,7 +26,9 @@ serde = { workspace = true }
 serde_json = "1.0"
 shared = { workspace = true }
 sha2 = "0.11"
-sqlx = { version = "0.8", default-features = false, features = ["chrono", "postgres", "runtime-tokio-rustls", "uuid"] }
+sqlx = { version = "0.8", default-features = false, features = ["postgres", "runtime-tokio-rustls"] }
+# Enable these types on the PostgreSQL driver so Cargo resolves only this database backend.
+sqlx-postgres = { version = "0.8", default-features = false, features = ["chrono", "json", "uuid"] }
 thiserror = { workspace = true }
 tokio = { workspace = true }
 tracing = { workspace = true }

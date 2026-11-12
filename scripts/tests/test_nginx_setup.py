@@ -207,7 +207,8 @@ class NginxSetupTests(unittest.TestCase):
 
     def test_install_configures_and_verifies_with_exact_certbot_arguments(self):
         setup = self.setup()
-        setup.install_and_configure("Example.COM", True, "admin@example.com")
+        token = "a" * 48
+        setup.install_and_configure("Example.COM", True, "admin@example.com", proxy_token=token)
         expected_certbot = [
             "certbot",
             "--nginx",
@@ -235,6 +236,13 @@ class NginxSetupTests(unittest.TestCase):
         )
         self.assertTrue(self.config.is_file())
         self.assert_mavi_link()
+        content = self.config.read_text(encoding="utf-8")
+        self.assertEqual(content.count("include sites-available/mavi-panel-proxy-headers.conf;"), 1)
+        self.assertNotIn(token, content)
+        proxy_headers = self.available / "mavi-panel-proxy-headers.conf"
+        self.assertEqual(proxy_headers.read_text(encoding="utf-8"), f"proxy_set_header X-Mavi-Proxy-Token {token};\n")
+        if os.name != "nt":
+            self.assertEqual(proxy_headers.stat().st_mode & 0o777, 0o600)
         self.assertFalse(any(command[0] == "apt-get" for command in self.runner.commands))
         for kwargs in self.runner.kwargs:
             self.assertEqual(kwargs["check"], True)
@@ -299,10 +307,11 @@ class NginxSetupTests(unittest.TestCase):
 
         setup = self.setup(callback)
         with self.assertRaises(NginxSetupError):
-            setup.install_and_configure("example.com", True, "admin@example.com")
+            setup.install_and_configure("example.com", True, "admin@example.com", proxy_token="a" * 48)
         self.assertFalse(os.path.lexists(self.config))
         self.assertFalse(os.path.lexists(self.link))
         self.assertFalse(os.path.lexists(self.backup))
+        self.assertFalse((self.available / "mavi-panel-proxy-headers.conf").exists())
 
     def test_default_and_other_sites_are_never_modified(self):
         default = self.enabled / "default"
