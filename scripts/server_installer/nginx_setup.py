@@ -2,7 +2,7 @@
 
 The caller is responsible for obtaining user consent and for installing Docker.
 All commands use argument lists, and all filesystem writes are confined to the
-Mavi site, its backup, and its sites-enabled symlink.
+Mavi site, its backup, its sites-enabled symlink, and its private proxy headers.
 """
 
 from __future__ import annotations
@@ -22,6 +22,7 @@ from typing import Any, Callable
 
 _PACKAGES = ["nginx", "certbot", "python3-certbot-nginx"]
 _CONFIG_NAME = "mavi-vpn.conf"
+_PROXY_HEADERS_FILE = "mavi-panel-proxy-headers.conf"
 _LABEL = re.compile(r"^[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?$")
 _EMAIL_LOCAL = re.compile(r"^[A-Za-z0-9.!#$%&'*+/=?^_`{|}~-]+$")
 
@@ -92,7 +93,9 @@ def _email(value: str) -> str:
     return value
 
 
-def _proxy_block(host: str, port: int, zone: str) -> str:
+def _proxy_block(host: str, port: int, zone: str, authenticate_proxy: bool = False) -> str:
+    proxy_headers = f"\n        include sites-available/{_PROXY_HEADERS_FILE};" if authenticate_proxy else ""
+    forwarded_for = "$remote_addr" if authenticate_proxy else "$proxy_add_x_forwarded_for"
     return f"""server {{
     listen 80;
     listen [::]:80;
@@ -116,7 +119,7 @@ def _proxy_block(host: str, port: int, zone: str) -> str:
         proxy_http_version 1.1;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-For {forwarded_for};{proxy_headers}
         proxy_set_header X-Forwarded-Proto $scheme;
         proxy_set_header X-Forwarded-Host $host;
         proxy_set_header Upgrade $http_upgrade;
@@ -132,6 +135,8 @@ def render_http_site(
     panel_enabled: bool,
     keycloak_port: int = 18080,
     panel_port: int = 18081,
+    *,
+    authenticate_proxy: bool = False,
 ) -> str:
     """Render HTTP virtual hosts for ACME and loopback proxying.
 
@@ -146,7 +151,7 @@ def render_http_site(
     blocks = [_proxy_block(hosts[0], keycloak_port, "mavi_auth_limit")]
     if panel_enabled:
         zones += f"\nlimit_req_zone $binary_remote_addr zone=mavi_panel_limit:10m rate=10r/s;"
-        blocks.append(_proxy_block(hosts[1], panel_port, "mavi_panel_limit"))
+        blocks.append(_proxy_block(hosts[1], panel_port, "mavi_panel_limit", authenticate_proxy))
     return (
         "# Managed by Mavi. Do not edit; Certbot manages the HTTPS sections.\n"
         "map $http_upgrade $mavi_connection_upgrade {\n"
@@ -221,6 +226,7 @@ class NginxSetup:
         self._config = self._available_dir / _CONFIG_NAME
         self._backup = self._available_dir / f"{_CONFIG_NAME}.mavi-backup"
         self._link = self._enabled_dir / _CONFIG_NAME
+        self._proxy_headers = self._available_dir / _PROXY_HEADERS_FILE
 
     def _command(self, command: list[str], description: str) -> None:
         try:
@@ -344,11 +350,15 @@ class NginxSetup:
         email: str,
         *,
         install_packages: bool = False,
+        proxy_token: str = "",
     ) -> None:
         """Install on explicit request, configure Mavi, and verify the result."""
         base, hostnames = _hostnames(domain, panel_enabled)
         email = _email(email)
-        content = render_http_site(base, panel_enabled).encode("utf-8")
+        authenticate_proxy = panel_enabled and bool(proxy_token)
+        if authenticate_proxy and not re.fullmatch(r"[A-Za-z0-9_-]{32,128}", proxy_token):
+            raise NginxSetupError("MAVI_PANEL_PROXY_TOKEN has an invalid value")
+        content = render_http_site(base, panel_enabled, authenticate_proxy=authenticate_proxy).encode("utf-8")
         if install_packages:
             self._command(["apt-get", "update"], "APT package index update failed")
             self._command(
@@ -357,10 +367,18 @@ class NginxSetup:
             )
         self._check_layout()
         previous = self._snapshot()
+        previous_proxy_headers = None
+        if authenticate_proxy and os.path.lexists(self._proxy_headers):
+            if self._is_symlink(self._proxy_headers) or not self._proxy_headers.is_file():
+                raise NginxSetupError("Refusing to replace a non-regular Mavi proxy header file")
+            previous_proxy_headers = self._proxy_headers.read_bytes()
         certbot = ["certbot", "--nginx", "--non-interactive", "--agree-tos", "--email", email, "--redirect"]
         for name in hostnames:
             certbot.extend(["-d", name])
         try:
+            if authenticate_proxy:
+                header = f"proxy_set_header X-Mavi-Proxy-Token {proxy_token};\n".encode("ascii")
+                self._atomic_write(self._proxy_headers, header, 0o600)
             self._write_candidate(content, previous)
             self._command(["nginx", "-t"], "Mavi HTTP Nginx configuration is invalid")
             self._command(certbot, "Certbot Nginx configuration failed")
@@ -369,5 +387,10 @@ class NginxSetup:
             self._configure_timer()
         except Exception:
             self._rollback(previous)
+            if authenticate_proxy:
+                if previous_proxy_headers is None:
+                    self._proxy_headers.unlink(missing_ok=True)
+                else:
+                    self._atomic_write(self._proxy_headers, previous_proxy_headers, 0o600)
             self._reload_after_rollback()
             raise

@@ -29,7 +29,9 @@ from scripts.server_installer.config import (
     save_env,
     update_env_text,
 )
-from scripts.server_installer.keycloak_bootstrap import KeycloakAdmin, KeycloakError, PANEL_ROLES
+from scripts.server_installer.keycloak_bootstrap import KeycloakAdmin, KeycloakError, PANEL_ROLES, bootstrap_panel
+from scripts.server_installer import installer
+from scripts.server_installer.preflight import PreflightReport
 
 ROOT = Path(__file__).resolve().parents[2]
 
@@ -103,10 +105,10 @@ class ModeTests(unittest.TestCase):
         self.assertIn("VPN_AUTH_TOKEN", generated)
 
     def test_panel_transport_and_endpoint_match_server_settings(self):
-        for cr, http2, expected in [
-            ("true", "", "http3_censorship_resistant"),
-            ("false", "", "quic"),
-            ("false", "0.0.0.0:10443", "http2"),
+        for cr, http2, expected, port in [
+            ("true", "", "http3_censorship_resistant", 12443),
+            ("false", "", "quic", 12443),
+            ("false", "[::]:8443", "http2", 8443),
         ]:
             with self.subTest(expected=expected):
                 existing = {
@@ -117,7 +119,16 @@ class ModeTests(unittest.TestCase):
                 }
                 values, _ = build_configuration(panel_plan(), existing, secret_factory)
                 self.assertEqual(values["MAVI_PANEL_TRANSPORT"], expected)
-                self.assertEqual(values["MAVI_PANEL_VPN_ENDPOINT"], "vpn.example.net:12443")
+                self.assertEqual(values["MAVI_PANEL_VPN_ENDPOINT"], f"vpn.example.net:{port}")
+
+    def test_panel_preserves_explicit_public_endpoint(self):
+        existing = {
+            "VPN_HTTP2_BIND_ADDR": "0.0.0.0:8443",
+            "MAVI_PANEL_VPN_ENDPOINT": "vpn.example.net:443",
+        }
+        values, _ = build_configuration(panel_plan(), existing, secret_factory)
+        self.assertEqual(values["MAVI_PANEL_VPN_ENDPOINT"], "vpn.example.net:443")
+        self.assertEqual(values["MAVI_PANEL_TRANSPORT"], "http2")
 
 
 class EnvironmentTests(unittest.TestCase):
@@ -128,6 +139,7 @@ class EnvironmentTests(unittest.TestCase):
             "KEYCLOAK_ADMIN_PASS": "keep-admin",
             "MAVI_PANEL_DB_PASSWORD": "keep-panel-database",
             "MAVI_PANEL_CLIENT_SECRET": "keep-panel-client",
+            "MAVI_PANEL_PROXY_TOKEN": "keep-panel-proxy-token",
             "CUSTOM_SETTING": "keep-custom",
         }
 
@@ -203,7 +215,7 @@ class ComposeContractTests(unittest.TestCase):
             "MAVI_PANEL_PUBLIC_URL: https://panel.${DOMAIN_NAME}",
             "MAVI_PANEL_KEYCLOAK_URL: ${VPN_KEYCLOAK_URL}",
             "MAVI_PANEL_CLIENT_ID: mavi-panel",
-            "MAVI_PANEL_CLIENT_SECRET: ${MAVI_PANEL_CLIENT_SECRET}",
+            "MAVI_PANEL_CLIENT_SECRET: ${MAVI_PANEL_CLIENT_SECRET:-}",
             "MAVI_PANEL_VPN_ENDPOINT: ${MAVI_PANEL_VPN_ENDPOINT}",
             "MAVI_PANEL_CERT_PIN_FILE: /server-data/cert_pin.txt",
             "MAVI_PANEL_ECH_CONFIG_FILE: /server-data/ech_config_hex.txt",
@@ -246,11 +258,39 @@ class ComposeContractTests(unittest.TestCase):
         cases = [
             ({"TRAEFIK_BIND_ADDR": "0.0.0.0", "VPN_KEYCLOAK_ENABLED": "true"}, PROXY_TRAEFIK),
             ({"TRAEFIK_BIND_ADDR": "127.0.0.1", "VPN_KEYCLOAK_ENABLED": "true"}, PROXY_EXTERNAL),
-            ({"VPN_KEYCLOAK_ENABLED": "true", "COMPOSE_PROFILES": ""}, PROXY_NGINX),
+            ({"VPN_KEYCLOAK_ENABLED": "true", "ACME_EMAIL": "admin@example.com"}, PROXY_NGINX),
+            ({"COMPOSE_PROFILES": "traefik,keycloak", "ACME_EMAIL": "admin@example.com"}, PROXY_EXTERNAL),
+            ({"VPN_KEYCLOAK_ENABLED": "true"}, PROXY_EXTERNAL),
         ]
         for values, expected in cases:
             with self.subTest(expected=expected):
                 self.assertEqual(plan_from_existing(values).proxy, expected)
+
+    def test_new_external_proxy_stays_external_on_rerun(self):
+        plan = panel_plan(proxy=PROXY_EXTERNAL, acme_email="")
+        values, _ = build_configuration(plan, {}, secret_factory)
+        self.assertEqual(plan_from_existing(values).proxy, PROXY_EXTERNAL)
+
+    def test_no_start_writes_configuration_without_running_nginx_or_compose(self):
+        with temporary_directory() as directory:
+            root = Path(directory)
+            backend = root / "backend"
+            backend.mkdir()
+            (backend / "docker-compose.yml").touch()
+            with (
+                mock.patch.object(installer, "collect_preflight", return_value=PreflightReport([])),
+                mock.patch.object(installer, "preflight_dns", return_value={}),
+                mock.patch.object(installer, "install_nginx_with_consent") as nginx,
+                mock.patch.object(installer, "start_stack") as stack,
+            ):
+                result = installer.main([
+                    "--project-root", str(root), "--non-interactive", "--mode", "keycloak",
+                    "--domain", "example.com", "--yes", "--no-start",
+                ])
+            self.assertEqual(result, 0)
+            self.assertEqual(load_env(backend / ".env")["MAVI_PROXY_MODE"], PROXY_NGINX)
+            nginx.assert_not_called()
+            stack.assert_not_called()
 
     def test_new_nginx_install_writes_no_traefik_settings_and_no_profile(self):
         values, _ = build_configuration(panel_plan(), {}, secret_factory)
@@ -315,16 +355,38 @@ class KeycloakBootstrapTests(unittest.TestCase):
     def api(self):
         return KeycloakAdmin("https://auth.example.com", "mavi-vpn", "admin", "not-sent")
 
+    def test_interrupted_bootstrap_can_still_adopt_the_authoritative_secret(self):
+        values, _ = build_configuration(panel_plan(), {}, secret_factory)
+        self.assertNotIn("MAVI_PANEL_CLIENT_SECRET", values)
+        with temporary_directory() as directory:
+            path = Path(directory) / ".env"
+            save_env(path, values)
+            with mock.patch("scripts.server_installer.keycloak_bootstrap.KeycloakAdmin") as admin_class:
+                admin = admin_class.return_value
+                admin.ensure_client.return_value = ("client-id", "secret-from-keycloak")
+                admin.ensure_default_roles.side_effect = KeycloakError("interrupted after creating client")
+                with self.assertRaises(KeycloakError):
+                    bootstrap_panel(values, path)
+                values = load_env(path)
+                self.assertNotIn("MAVI_PANEL_CLIENT_SECRET", values)
+                admin.ensure_default_roles.side_effect = None
+                bootstrap_panel(values, path)
+                self.assertTrue(admin.ensure_client.call_args.kwargs["adopt_existing_secret"])
+                self.assertEqual(load_env(path)["MAVI_PANEL_CLIENT_SECRET"], "secret-from-keycloak")
+
     def test_existing_client_secret_is_not_reset_when_adopted(self):
         api = self.api()
-        existing = {"id": "client-id", "clientId": "mavi-panel", "attributes": {"existing": "kept"}}
+        existing = {
+            "id": "client-id", "clientId": "mavi-panel",
+            "attributes": {"existing": "kept"}, "secret": "existing-secret",
+        }
         requests = []
 
         def request(method, path, payload=None, **kwargs):
             requests.append((method, path, payload))
             if method == "GET" and path.endswith("/clients?clientId=mavi-panel"):
                 return [existing]
-            if method == "GET" and path.endswith("/secret"):
+            if method == "GET" and path == "/admin/realms/mavi-vpn/clients/client-id/client-secret":
                 return {"value": "existing-secret"}
             if method == "GET" and path.endswith("/protocol-mappers/models"):
                 return [{"id": "mapper-id", "name": "mavi-panel-realm-roles"}]
@@ -346,13 +408,26 @@ class KeycloakBootstrapTests(unittest.TestCase):
         def request(method, path, **kwargs):
             if method == "GET" and "clients?clientId=" in path:
                 return [existing]
-            if method == "GET" and path.endswith("/secret"):
+            if method == "GET" and path == "/admin/realms/mavi-vpn/clients/client-id/client-secret":
                 return {"value": "existing-secret"}
             return {}
 
         api._request = request
         with self.assertRaisesRegex(KeycloakError, "No secret was changed"):
             api.ensure_client("https://panel.example.com", "different-secret")
+
+    def test_missing_or_unusable_existing_secret_never_updates_the_client(self):
+        existing = {"id": "client-id", "clientId": "mavi-panel"}
+        for response in (None, {}, {"value": ""}, {"value": 123}, KeycloakError("HTTP 404")):
+            with self.subTest(response=response):
+                api = self.api()
+                api._request = mock.Mock(side_effect=[[existing], response])
+                with self.assertRaises(KeycloakError):
+                    api.ensure_client("https://panel.example.com", "new-secret", adopt_existing_secret=True)
+                self.assertEqual(api._request.call_args_list, [
+                    mock.call("GET", "/admin/realms/mavi-vpn/clients?clientId=mavi-panel"),
+                    mock.call("GET", "/admin/realms/mavi-vpn/clients/client-id/client-secret"),
+                ])
 
     def test_existing_admin_password_and_roles_are_preserved(self):
         api = self.api()

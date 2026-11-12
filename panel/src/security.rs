@@ -25,6 +25,10 @@ pub fn hash_token(token: &str) -> String {
     URL_SAFE_NO_PAD.encode(Sha256::digest(token.as_bytes()))
 }
 
+pub fn session_csrf_token(session_token: &str) -> String {
+    hash_token(&format!("mavi-panel csrf v1:{session_token}"))
+}
+
 pub fn pkce_challenge(verifier: &str) -> String {
     URL_SAFE_NO_PAD.encode(Sha256::digest(verifier.as_bytes()))
 }
@@ -212,6 +216,22 @@ mod tests {
             HeaderValue::from_static("__Host-mavi_session=abc; __Host-mavi_session=def"),
         );
         assert!(cookie_value(&headers, SESSION_COOKIE).is_none());
+    }
+
+    #[test]
+    fn csrf_token_is_stable_within_a_session_and_scoped_to_it() {
+        let session = random_token().unwrap();
+        let tab_one = session_csrf_token(&session);
+        let tab_two = session_csrf_token(&session);
+        let other_session = session_csrf_token(&random_token().unwrap());
+        assert_eq!(tab_one, tab_two);
+        assert_ne!(tab_one, session);
+        assert_ne!(tab_one, hash_token(&session));
+
+        let mut headers = HeaderMap::new();
+        headers.insert(CSRF_HEADER, HeaderValue::from_str(&tab_one).unwrap());
+        assert!(csrf_matches(&headers, &hash_token(&tab_two)));
+        assert!(!csrf_matches(&headers, &hash_token(&other_session)));
     }
 
     #[test]

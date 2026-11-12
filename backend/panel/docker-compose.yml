@@ -48,7 +48,9 @@ services:
       MAVI_PANEL_KEYCLOAK_URL: ${VPN_KEYCLOAK_URL}
       MAVI_PANEL_KEYCLOAK_REALM: ${VPN_KEYCLOAK_REALM:-mavi-vpn}
       MAVI_PANEL_CLIENT_ID: mavi-panel
-      MAVI_PANEL_CLIENT_SECRET: ${MAVI_PANEL_CLIENT_SECRET}
+      MAVI_PANEL_CLIENT_SECRET: ${MAVI_PANEL_CLIENT_SECRET:-}
+      MAVI_PANEL_VPN_CLIENT_ID: ${VPN_KEYCLOAK_CLIENT_ID:-mavi-client}
+      MAVI_PANEL_PROXY_TOKEN: ${MAVI_PANEL_PROXY_TOKEN:-}
       MAVI_PANEL_VPN_ENDPOINT: ${MAVI_PANEL_VPN_ENDPOINT}
       MAVI_PANEL_CERT_PIN_FILE: /server-data/cert_pin.txt
       MAVI_PANEL_ECH_CONFIG_FILE: /server-data/ech_config_hex.txt
@@ -72,6 +74,8 @@ services:
       - "traefik.http.routers.panel.entrypoints=${TRAEFIK_ROUTER_ENTRYPOINTS:-web}"
       - "traefik.http.routers.panel.tls=${TRAEFIK_TLS_ENABLED:-false}"
       - "traefik.http.routers.panel.tls.certresolver=${TRAEFIK_ACME_RESOLVER:-myresolver}"
+      - "traefik.http.routers.panel.middlewares=mavi-panel-forwarded"
+      - "traefik.http.middlewares.mavi-panel-forwarded.headers.customrequestheaders.X-Mavi-Proxy-Token=${MAVI_PANEL_PROXY_TOKEN:-}"
       - "traefik.http.services.panel.loadbalancer.server.port=8081"
 
 volumes:

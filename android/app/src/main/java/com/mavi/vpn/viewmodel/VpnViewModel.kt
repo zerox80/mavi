@@ -103,21 +103,28 @@ class VpnViewModel(
         _errorMessage.value = message
     }
 
-    internal fun startEnrollment(request: EnrollmentRequest) {
-        if (mutableEnrollmentState.value != EnrollmentUiState.Idle || !handledEnrollmentRequests.add(request.fingerprint)) {
+    internal fun startEnrollment(
+        request: EnrollmentRequest,
+        redeem: suspend (EnrollmentRequest) -> EnrollmentRedeemResult = EnrollmentClient::redeem,
+    ) {
+        if (mutableEnrollmentState.value != EnrollmentUiState.Idle || request.fingerprint in handledEnrollmentRequests) {
             return
         }
         if (!enrollmentImportAllowed(connectionState.value)) {
             mutableEnrollmentState.value =
                 EnrollmentUiState.Error(
-                    "Disconnect the VPN before importing an enrollment profile. The ticket has not been redeemed.",
+                    "Disconnect the VPN and reopen the same enrollment link to try again.",
                 )
             return
         }
         mutableEnrollmentState.value = EnrollmentUiState.Redeeming
         viewModelScope.launch {
+            val result = redeem(request)
+            if (result !is EnrollmentRedeemResult.Failure || !result.canRetry) {
+                handledEnrollmentRequests.add(request.fingerprint)
+            }
             mutableEnrollmentState.value =
-                when (val result = EnrollmentClient.redeem(request)) {
+                when (result) {
                     is EnrollmentRedeemResult.Success -> EnrollmentUiState.Confirmation(result.profile)
                     is EnrollmentRedeemResult.Failure -> EnrollmentUiState.Error(result.message)
                 }

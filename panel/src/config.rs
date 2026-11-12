@@ -92,6 +92,8 @@ impl FromStr for PanelTransport {
 pub struct Config {
     pub database_url: String,
     pub keycloak: KeycloakSettings,
+    pub vpn_client_id: String,
+    pub proxy_token: Option<String>,
     pub public_url: Url,
     pub public_base: String,
     pub public_origin: String,
@@ -119,6 +121,24 @@ impl Config {
         let realm = required("MAVI_PANEL_KEYCLOAK_REALM", &mut lookup)?;
         let client_id = required("MAVI_PANEL_CLIENT_ID", &mut lookup)?;
         let client_secret = required("MAVI_PANEL_CLIENT_SECRET", &mut lookup)?;
+        let vpn_client_id =
+            lookup("MAVI_PANEL_VPN_CLIENT_ID").unwrap_or_else(|| "mavi-client".into());
+        if vpn_client_id == client_id {
+            return Err(ConfigError::new(
+                "MAVI_PANEL_VPN_CLIENT_ID must identify a different client from MAVI_PANEL_CLIENT_ID",
+            ));
+        }
+        let proxy_token = lookup("MAVI_PANEL_PROXY_TOKEN").filter(|value| !value.is_empty());
+        if proxy_token.as_deref().is_some_and(|value| {
+            !(32..=128).contains(&value.len())
+                || !value
+                    .bytes()
+                    .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'_'))
+        }) {
+            return Err(ConfigError::new(
+                "MAVI_PANEL_PROXY_TOKEN has an invalid value",
+            ));
+        }
         let public_url = required("MAVI_PANEL_PUBLIC_URL", &mut lookup)?;
         let vpn_endpoint = required("MAVI_PANEL_VPN_ENDPOINT", &mut lookup)?;
         let insecure_http = parse_bool(
@@ -157,6 +177,8 @@ impl Config {
                 client_id,
                 client_secret,
             },
+            vpn_client_id,
+            proxy_token,
             public_url,
             public_base,
             public_origin,
@@ -206,7 +228,11 @@ impl Config {
         label: String,
     ) -> Result<EnrollmentProfile, ConfigError> {
         let cert_pin = read_required_file(&self.cert_pin_file).await?;
-        let ech_config = read_optional_file(&self.ech_config_file).await?;
+        let ech_config = if self.transport == PanelTransport::Http2 {
+            None
+        } else {
+            read_optional_file(&self.ech_config_file).await?
+        };
         let profile = self.profile_from_files(device_id, label, cert_pin, ech_config)?;
         profile.validate().map_err(ConfigError::new)?;
         Ok(profile)
@@ -231,7 +257,7 @@ impl Config {
             keycloak: EnrollmentKeycloak {
                 url: self.keycloak.url.clone(),
                 realm: self.keycloak.realm.clone(),
-                client_id: self.keycloak.client_id.clone(),
+                client_id: self.vpn_client_id.clone(),
             },
         })
     }

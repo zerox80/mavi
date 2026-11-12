@@ -98,11 +98,13 @@ The installer does not verify public firewall or NAT reachability. A successful 
 
 #### External reverse proxy
 
-Choose `--proxy external` when an existing reverse proxy terminates TLS. The installer writes no proxy settings at all and leaves public TLS termination to you. Forward `auth.<domain>` to `http://127.0.0.1:18080` and, when enabled, `panel.<domain>` to `http://127.0.0.1:18081`, preserving the `Host`, `X-Forwarded-For`, `X-Forwarded-Proto`, and WebSocket headers. See [NGINX_PROXY.md](NGINX_PROXY.md) for the Keycloak example and add the panel hostname with the same proxy settings.
+Choose `--proxy external` when an existing reverse proxy terminates TLS. Forward `auth.<domain>` to `http://127.0.0.1:18080` and, when enabled, forward `panel.<domain>` directly to `http://127.0.0.1:18081`. Pass the original host, HTTPS scheme, client IP, and WebSocket headers.
+
+For the panel, set `X-Mavi-Proxy-Token` to the value of `MAVI_PANEL_PROXY_TOKEN` from the protected `backend/.env`, replacing any incoming value. Set `X-Forwarded-For` to the client IP observed by the proxy, or append that IP as the final address. Keep the token in a private proxy configuration file. Managed Nginx and standalone Traefik configure these headers automatically.
 
 #### Legacy standalone Traefik
 
-Existing installations that were set up with the Traefik profile keep working unchanged. Only a new explicit `--proxy traefik` selection writes `COMPOSE_PROFILES=traefik` with public Traefik bindings, ACME, and the `TRAEFIK_*` variables; the installer's default is Nginx. Existing `.env` files are classified by their `TRAEFIK_BIND_ADDR` value (`0.0.0.0` keeps standalone Traefik, another address keeps the loopback external mode) and are never rewritten to a different mode.
+The installer saves the proxy selection as `MAVI_PROXY_MODE` and reuses it on subsequent runs. For older configurations, `TRAEFIK_BIND_ADDR=0.0.0.0` selects standalone Traefik. A loopback bind or a legacy Traefik profile with no explicit bind selects external proxy mode and retains the Traefik profile. Older configurations with an ACME email and no Traefik settings keep managed Nginx. Other unmarked configurations default to external proxy mode.
 
 ### Keycloak and panel bootstrap
 
@@ -161,6 +163,8 @@ Installations created before the prebuilt images became the default compiled the
 ```bash
 COMPOSE_FILE=docker-compose.yml:docker-compose.build.yml
 ```
+
+If an existing panel installation has no `MAVI_PANEL_PROXY_TOKEN`, rerun `./install-server.sh` from the repository root when upgrading. The installer generates the token and updates managed Nginx. For an external reverse proxy, apply the panel headers described in [External reverse proxy](#external-reverse-proxy) and forward the panel hostname directly to its loopback port so the rate limiter uses each client's IP.
 
 ### Client credentials
 

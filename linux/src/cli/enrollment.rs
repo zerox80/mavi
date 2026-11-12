@@ -2,7 +2,9 @@ use anyhow::{Context, Result};
 use shared::enrollment::client::EnrollmentRequest;
 use shared::enrollment::EnrollmentProfile;
 use std::io::{self, BufRead, Write};
-use std::path::{Path, PathBuf};
+#[cfg(test)]
+use std::path::Path;
+use std::path::PathBuf;
 
 use super::{config, daemon, daemon_credentials, secrets};
 

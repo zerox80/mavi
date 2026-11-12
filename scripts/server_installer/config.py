@@ -19,6 +19,7 @@ MODES = (PANEL, CLASSIC, KEYCLOAK)
 PROXY_NGINX = "nginx"
 PROXY_TRAEFIK = "traefik"
 PROXY_EXTERNAL = "external"
+PROXY_MODES = (PROXY_NGINX, PROXY_EXTERNAL, PROXY_TRAEFIK)
 BASE_COMPOSE = "docker-compose.yml"
 KEYCLOAK_COMPOSE = "keycloak/docker-compose.yml"
 PANEL_COMPOSE = "panel/docker-compose.yml"
@@ -31,6 +32,7 @@ _SECRET_KEYS = (
     "KEYCLOAK_ADMIN_PASS",
     "MAVI_PANEL_DB_PASSWORD",
     "MAVI_PANEL_CLIENT_SECRET",
+    "MAVI_PANEL_PROXY_TOKEN",
 )
 _ENV_LINE = re.compile(r"^\s*(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)\s*=")
 _SAFE_VALUE = re.compile(r"^[A-Za-z0-9_./:@%+,=-]*$")
@@ -127,17 +129,25 @@ def generate_secret(_name: str = "") -> str:
 
 
 def proxy_from_environment(values: Mapping[str, str]) -> str:
-    """Classify the proxy of an existing installation without changing it.
-
-    The old Traefik profile binds publicly for standalone HTTPS or to loopback
-    behind an external proxy. A .env without Traefik bindings uses host Nginx.
-    """
+    """Read the saved proxy mode or infer it for older installations."""
+    saved = values.get("MAVI_PROXY_MODE", "").strip()
+    if saved:
+        if saved not in PROXY_MODES:
+            raise ConfigurationError("MAVI_PROXY_MODE must be nginx, external, or traefik.")
+        return saved
     bind = values.get("TRAEFIK_BIND_ADDR", "").strip()
     if bind == "0.0.0.0":
         return PROXY_TRAEFIK
     if bind:
         return PROXY_EXTERNAL
-    return PROXY_NGINX
+    if uses_traefik_profile(values):
+        # Older Compose files defaulted to a loopback bind and an external proxy.
+        return PROXY_EXTERNAL
+    return PROXY_NGINX if values.get("ACME_EMAIL", "").strip() else PROXY_EXTERNAL
+
+
+def uses_traefik_profile(values: Mapping[str, str]) -> bool:
+    return "traefik" in {profile.strip() for profile in values.get("COMPOSE_PROFILES", "").split(",")}
 
 
 def plan_from_existing(values: Mapping[str, str]) -> InstallPlan:
@@ -196,6 +206,7 @@ def build_configuration(
 
     domain = validate_domain(plan.domain or values.get("DOMAIN_NAME", ""))
     values["DOMAIN_NAME"] = domain
+    values["MAVI_PROXY_MODE"] = plan.proxy
     values["VPN_KEYCLOAK_URL"] = values.get("VPN_KEYCLOAK_URL") or f"https://auth.{domain}"
     values["VPN_KEYCLOAK_REALM"] = values.get("VPN_KEYCLOAK_REALM", "mavi-vpn")
     values["VPN_KEYCLOAK_CLIENT_ID"] = values.get("VPN_KEYCLOAK_CLIENT_ID", "mavi-client")
@@ -208,15 +219,14 @@ def build_configuration(
 
     if plan.uses_panel:
         _secret(values, "MAVI_PANEL_DB_PASSWORD", secret_factory, generated)
-        _secret(values, "MAVI_PANEL_CLIENT_SECRET", secret_factory, generated)
+        _secret(values, "MAVI_PANEL_PROXY_TOKEN", secret_factory, generated)
         public_host = values.get("VPN_PUBLIC_HOST") or domain
-        values["MAVI_PANEL_VPN_ENDPOINT"] = f"{public_host}:{values.get('VPN_PORT', '10443')}"
-        if values.get("VPN_HTTP2_BIND_ADDR"):
-            transport = "http2"
-        elif parse_bool(values.get("VPN_CENSORSHIP_RESISTANT")):
-            transport = "http3_censorship_resistant"
-        else:
-            transport = "quic"
+        http2_bind = values.get("VPN_HTTP2_BIND_ADDR")
+        quic_transport = "http3_censorship_resistant" if parse_bool(values.get("VPN_CENSORSHIP_RESISTANT")) else "quic"
+        transport = values.get("MAVI_PANEL_TRANSPORT") or ("http2" if http2_bind else quic_transport)
+        bind = http2_bind if transport == "http2" else values["VPN_BIND_ADDR"]
+        port = bind.rsplit(":", 1)[-1] if bind else values["VPN_PORT"]
+        values["MAVI_PANEL_VPN_ENDPOINT"] = values.get("MAVI_PANEL_VPN_ENDPOINT") or f"{public_host}:{port}"
         values["MAVI_PANEL_TRANSPORT"] = transport
 
     if not plan.existing:

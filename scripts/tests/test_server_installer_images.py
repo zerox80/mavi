@@ -49,9 +49,9 @@ def recorded_start(plan: InstallPlan, fail_on: str = "") -> list[list[str]]:
         if fail_on and fail_on in command:
             raise subprocess.CalledProcessError(1, command)
 
-    bootstrap = mock.Mock(return_value=mock.Mock(client_secret="secret", admin=None))
+    bootstrap = mock.Mock(return_value=None)
     with mock.patch.object(installer, "run", run), mock.patch.object(installer, "bootstrap_panel", bootstrap):
-        installer.start_stack(Path("backend"), plan, {"MAVI_PANEL_CLIENT_SECRET": "secret"}, set())
+        installer.start_stack(Path("backend"), plan, {})
     return commands
 
 

@@ -16,6 +16,7 @@ internal sealed interface EnrollmentRedeemResult {
 
     data class Failure(
         val message: String,
+        val canRetry: Boolean = false,
     ) : EnrollmentRedeemResult
 }
 
@@ -47,7 +48,10 @@ internal object EnrollmentClient {
             try {
                 httpClient.newCall(httpRequest).execute().use { response ->
                     if (!response.isSuccessful) {
-                        return@withContext EnrollmentRedeemResult.Failure(httpError(response.code))
+                        return@withContext EnrollmentRedeemResult.Failure(
+                            httpError(response.code),
+                            canRetry = response.code == 429,
+                        )
                     }
                     if (response.body.contentLength() > MAX_RESPONSE_BYTES) {
                         return@withContext EnrollmentRedeemResult.Failure("Enrollment response is too large")
@@ -79,7 +83,7 @@ internal object EnrollmentClient {
     private fun httpError(statusCode: Int): String =
         when (statusCode) {
             404, 410 -> "Enrollment link is invalid, expired, or already used"
-            429 -> "Too many enrollment attempts; try again later"
+            429 -> "Too many enrollment attempts. Wait and reopen the same link to try again."
             else -> "Enrollment server rejected the request"
         }
 }

@@ -3,7 +3,7 @@ use crate::db::sessions;
 use crate::oidc::OidcError;
 use crate::security::{
     clear_login_cookie, clear_session_cookie, cookie_value, hash_token, login_cookie,
-    pkce_challenge, random_token, session_cookie, valid_ticket, LOGIN_COOKIE,
+    pkce_challenge, random_token, session_cookie, session_csrf_token, valid_ticket, LOGIN_COOKIE,
 };
 use crate::state::AppState;
 use axum::extract::{Query, State};
@@ -140,7 +140,7 @@ async fn complete_callback(
             }
         })?;
     let session = random_token().map_err(|_| ApiError::internal("session randomness"))?;
-    let csrf = random_token().map_err(|_| ApiError::internal("CSRF randomness"))?;
+    let csrf = session_csrf_token(&session);
     sessions::create_session(&state.pool, &session, &csrf, &identity)
         .await
         .map_err(|_| ApiError::internal("session creation"))?;
