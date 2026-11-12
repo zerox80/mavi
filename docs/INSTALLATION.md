@@ -152,7 +152,9 @@ docker compose pull
 docker compose up -d
 ```
 
-Git does not touch `.env` or `data/`. Active VPN connections are interrupted while the VPN container is replaced, and clients reconnect. Rerunning `./install-server.sh` is not required for an update.
+Git does not touch `.env` or `data/`. Active VPN connections are interrupted while the VPN container is replaced, and clients reconnect. Rerunning `./install-server.sh` is not required for a regular update.
+
+If an existing panel installation has no `MAVI_PANEL_PROXY_TOKEN`, rerun `./install-server.sh` from the repository root when upgrading. The installer generates the token and updates managed Nginx. For an external reverse proxy, apply the panel headers described in [External reverse proxy](#external-reverse-proxy) and forward the panel hostname directly to its loopback port so the rate limiter uses each client's IP.
 
 A source-build installation updates with `git pull --ff-only` followed by `docker compose up -d --build` instead.
 
@@ -163,8 +165,6 @@ Installations created before the prebuilt images became the default compiled the
 ```bash
 COMPOSE_FILE=docker-compose.yml:docker-compose.build.yml
 ```
-
-If an existing panel installation has no `MAVI_PANEL_PROXY_TOKEN`, rerun `./install-server.sh` from the repository root when upgrading. The installer generates the token and updates managed Nginx. For an external reverse proxy, apply the panel headers described in [External reverse proxy](#external-reverse-proxy) and forward the panel hostname directly to its loopback port so the rate limiter uses each client's IP.
 
 ### Client credentials
 
