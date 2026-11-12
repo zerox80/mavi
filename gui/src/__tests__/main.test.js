@@ -4,7 +4,6 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
   escapeHtml,
-  initials,
   friendlyError,
   heroFromVpnStatus,
   toConfig,
@@ -41,29 +40,6 @@ describe('escapeHtml', () => {
   it('converts non-string input via String()', () => {
     expect(escapeHtml(null)).toBe('null');
     expect(escapeHtml(42)).toBe('42');
-  });
-});
-
-describe('initials', () => {
-  it('returns first char for single word', () => {
-    expect(initials('Hello')).toBe('H');
-  });
-
-  it('returns first char of first two words', () => {
-    expect(initials('My Server')).toBe('MS');
-  });
-
-  it('handles underscores, slashes, and ·', () => {
-    expect(initials('my_server')).toBe('MS');
-    expect(initials('my/server')).toBe('MS');
-    expect(initials('my·server')).toBe('MS');
-  });
-
-  it('returns ? for empty string but coerces other values', () => {
-    expect(initials('')).toBe('?');
-    expect(initials(null)).toBe('N'); // from "null"
-    expect(initials(undefined)).toBe('U'); // from "undefined"
-    expect(initials(42)).toBe('4');
   });
 });
 
@@ -233,7 +209,9 @@ describe('heroFromVpnStatus', () => {
   });
 
   it('maps Reconnecting to connecting (transient auto-retry, never off)', () => {
-    expect(heroFromVpnStatus({ service_available: true, state: 'Reconnecting' })).toBe('connecting');
+    expect(heroFromVpnStatus({ service_available: true, state: 'Reconnecting' })).toBe(
+      'connecting'
+    );
   });
 
   it('maps Connected or running=true to on', () => {

@@ -1,6 +1,6 @@
 import { state, $ } from './state.js';
 import { savePrefs } from './theme.js';
-import { escapeHtml, initials } from './utils.js';
+import { escapeHtml } from './utils.js';
 import { showToast } from './toast.js';
 
 let _openModal = null;
@@ -59,7 +59,6 @@ export function renderConnectionList() {
       selectConnection(c.id);
     });
     row.innerHTML = `
-      <div class="avatar">${escapeHtml(initials(c.label))}</div>
       <div class="main">
         <div class="label">${escapeHtml(c.label)}</div>
         <div class="endpoint">${escapeHtml(c.endpoint)}</div>

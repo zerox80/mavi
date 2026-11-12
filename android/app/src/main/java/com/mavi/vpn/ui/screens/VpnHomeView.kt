@@ -24,12 +24,11 @@ import androidx.compose.ui.unit.sp
 import com.mavi.vpn.VpnConnectionState
 import com.mavi.vpn.formatPauseRemaining
 import com.mavi.vpn.ui.components.DetailRow
-import com.mavi.vpn.ui.components.MaviCard
 import com.mavi.vpn.ui.components.MaviDivider
 import com.mavi.vpn.ui.components.NavRow
 import com.mavi.vpn.ui.components.PrimaryButton
 import com.mavi.vpn.ui.components.SecondaryButton
-import com.mavi.vpn.ui.components.StatusPill
+import com.mavi.vpn.ui.components.StatusLine
 import com.mavi.vpn.ui.components.StatusTone
 import com.mavi.vpn.ui.theme.MaviTheme
 import com.mavi.vpn.viewmodel.VpnViewModel
@@ -130,42 +129,24 @@ fun HomeView(
             text = "Mavi VPN",
             style = MaterialTheme.typography.titleMedium,
             color = T.ink,
-            modifier = Modifier.padding(start = 4.dp, top = 4.dp, bottom = 20.dp),
+            modifier = Modifier.padding(start = 4.dp, top = 4.dp, bottom = 28.dp),
         )
 
-        MaviCard {
-            Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 20.dp)) {
-                StatusPill(label = statusLabel, tone = statusTone, pulsing = isConnecting)
-                Spacer(modifier = Modifier.height(8.dp))
-                Text(text = statusDetail, style = MaterialTheme.typography.bodyMedium, color = T.mute)
-            }
-            MaviDivider()
-            Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
-                Text(
-                    text = "Next connection",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = T.mute,
-                )
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    text = serverIp.ifEmpty { "No endpoint configured" },
-                    style = MaterialTheme.typography.headlineSmall,
-                    color = T.ink,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            }
-            MaviDivider()
-            DetailRow(label = "Port", value = serverPort.ifEmpty { "—" }, mono = true)
-            MaviDivider()
-            DetailRow(label = "Authentication", value = if (useKeycloak) "Keycloak" else "Pre-shared key")
-            MaviDivider()
-            DetailRow(label = "Protocol", value = if (http2Framing) "TCP · TLS 1.3" else "QUIC · TLS 1.3")
-            MaviDivider()
-            DetailRow(label = "Transport", value = transport)
+        Column(modifier = Modifier.padding(horizontal = 4.dp)) {
+            StatusLine(label = statusLabel, tone = statusTone, pulsing = isConnecting)
+            Spacer(modifier = Modifier.height(10.dp))
+            Text(
+                text = serverIp.ifEmpty { "No endpoint configured" },
+                style = MaterialTheme.typography.headlineSmall,
+                color = T.ink,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Spacer(modifier = Modifier.height(6.dp))
+            Text(text = statusDetail, style = MaterialTheme.typography.bodyMedium, color = T.mute)
         }
 
-        Spacer(modifier = Modifier.height(16.dp))
+        Spacer(modifier = Modifier.height(24.dp))
 
         val actionLabel = when {
             isConnected -> "Disconnect"
@@ -197,14 +178,23 @@ fun HomeView(
             }
         }
 
-        Spacer(modifier = Modifier.height(24.dp))
+        Spacer(modifier = Modifier.height(32.dp))
 
-        MaviCard {
-            NavRow(
-                title = "Settings",
-                description = "Transport, MTU and split tunneling",
-                onClick = onOpenSettings,
-            )
-        }
+        MaviDivider()
+        DetailRow(label = "Port", value = serverPort.ifEmpty { "—" }, mono = true)
+        MaviDivider()
+        DetailRow(label = "Authentication", value = if (useKeycloak) "Keycloak" else "Pre-shared key")
+        MaviDivider()
+        DetailRow(label = "Protocol", value = if (http2Framing) "TCP · TLS 1.3" else "QUIC · TLS 1.3")
+        MaviDivider()
+        DetailRow(label = "Transport", value = transport)
+        MaviDivider()
+        NavRow(
+            title = "Settings",
+            description = "Transport, MTU and split tunneling",
+            onClick = onOpenSettings,
+            horizontalPadding = 4.dp,
+        )
+        MaviDivider()
     }
 }

@@ -30,7 +30,7 @@ import com.mavi.vpn.ui.components.MaviDivider
 import com.mavi.vpn.ui.components.MaviTextField
 import com.mavi.vpn.ui.components.PrimaryButton
 import com.mavi.vpn.ui.components.SectionLabel
-import com.mavi.vpn.ui.components.StatusPill
+import com.mavi.vpn.ui.components.StatusLine
 import com.mavi.vpn.ui.components.StatusTone
 import com.mavi.vpn.ui.components.SwitchRow
 import com.mavi.vpn.ui.theme.MaviShapes
@@ -183,7 +183,7 @@ fun ConfigView(
                         val sessionUsable =
                             !keycloakSessionInvalid && (keycloakTokenUsableLocally || hasKeycloakRefreshToken)
 
-                        StatusPill(
+                        StatusLine(
                             label = statusText,
                             tone = if (sessionUsable) StatusTone.OK else StatusTone.PROGRESS,
                             modifier = Modifier.padding(top = 12.dp),

@@ -18,7 +18,8 @@ import androidx.compose.ui.unit.sp
 
 /**
  * Mavi VPN design tokens. The desktop client mirrors these names and values in
- * gui/src/style.css; change both when a token changes.
+ * gui/src/style.css; change both when a token changes. Neutrals lean toward the
+ * logo's blue, the accent is the logo blue, and its orange marks transitional states.
  */
 @Immutable
 data class MaviColors(
@@ -36,63 +37,57 @@ data class MaviColors(
     val accentSoft: Color,
     val onAccent: Color,
     val ok: Color,
-    val okSoft: Color,
     val warn: Color,
-    val warnSoft: Color,
     val danger: Color,
     val dangerSoft: Color,
 )
 
 val LightColors = MaviColors(
-    bg = Color(0xFFF6F7F9),
+    bg = Color(0xFFF3F5F7),
     surface = Color(0xFFFFFFFF),
     elevated = Color(0xFFFFFFFF),
-    subtle = Color(0xFFEEF0F3),
-    ink = Color(0xFF111318),
-    ink2 = Color(0xFF3F4551),
-    mute = Color(0xFF6B7280),
-    line = Color(0xFFE3E6EB),
-    lineStrong = Color(0xFFCFD4DC),
-    accent = Color(0xFF2B44FF),
-    accentSolid = Color(0xFF2B44FF),
-    accentSoft = Color(0xFFEDF0FF),
+    subtle = Color(0xFFE8ECF0),
+    ink = Color(0xFF0E1620),
+    ink2 = Color(0xFF3A4654),
+    mute = Color(0xFF637080),
+    line = Color(0xFFDDE2E8),
+    lineStrong = Color(0xFFC3CBD4),
+    accent = Color(0xFF0B63B5),
+    accentSolid = Color(0xFF0B63B5),
+    accentSoft = Color(0xFFE3EEF9),
     onAccent = Color(0xFFFFFFFF),
-    ok = Color(0xFF0F7B4F),
-    okSoft = Color(0xFFE6F5ED),
-    warn = Color(0xFFA15C07),
-    warnSoft = Color(0xFFFDF3E1),
-    danger = Color(0xFFC0281F),
-    dangerSoft = Color(0xFFFDECEA),
+    ok = Color(0xFF0F7A4D),
+    warn = Color(0xFFB24F0A),
+    danger = Color(0xFFB42318),
+    dangerSoft = Color(0xFFFCEEEC),
 )
 
 val DarkColors = MaviColors(
-    bg = Color(0xFF0C0D10),
-    surface = Color(0xFF121418),
-    elevated = Color(0xFF1A1C22),
-    subtle = Color(0xFF1C1F26),
-    ink = Color(0xFFECEEF2),
-    ink2 = Color(0xFFB6BBC6),
-    mute = Color(0xFF808796),
-    line = Color(0xFF23262E),
-    lineStrong = Color(0xFF333742),
-    accent = Color(0xFF8494FF),
-    accentSolid = Color(0xFF3D55F5),
-    accentSoft = Color(0xFF1B2048),
+    bg = Color(0xFF0B0F14),
+    surface = Color(0xFF10161D),
+    elevated = Color(0xFF17202A),
+    subtle = Color(0xFF18212B),
+    ink = Color(0xFFE8EDF2),
+    ink2 = Color(0xFFB3BDC8),
+    mute = Color(0xFF7D8A98),
+    line = Color(0xFF1F2A35),
+    lineStrong = Color(0xFF2D3A47),
+    accent = Color(0xFF5AA9F0),
+    accentSolid = Color(0xFF1D73C9),
+    accentSoft = Color(0xFF0F2A44),
     onAccent = Color(0xFFFFFFFF),
-    ok = Color(0xFF45C98A),
-    okSoft = Color(0xFF11281E),
-    warn = Color(0xFFEAA64B),
-    warnSoft = Color(0xFF2B2112),
-    danger = Color(0xFFF0776C),
-    dangerSoft = Color(0xFF2E1614),
+    ok = Color(0xFF4CC58F),
+    warn = Color(0xFFF0974F),
+    danger = Color(0xFFF27B6E),
+    dangerSoft = Color(0xFF2E1714),
 )
 
 val LocalMaviColors = staticCompositionLocalOf { LightColors }
 
 /** Corner radii shared with the desktop client (--radius-md / --radius-lg). */
 object MaviShapes {
-    val control = 10.dp
-    val card = 14.dp
+    val control = 6.dp
+    val card = 8.dp
 }
 
 /** Technical values (endpoints, addresses, pins) are set in the monospace face. */

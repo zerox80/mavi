@@ -50,6 +50,7 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.mavi.vpn.ui.theme.MaviMono
@@ -94,26 +95,21 @@ fun SectionLabel(
     )
 }
 
-/** Small dot + label showing the connection state. The dot pulses while [pulsing]. */
+/** Dot and text showing a state, with no container. The dot pulses while [pulsing]. */
 @Composable
-fun StatusPill(
+fun StatusLine(
     label: String,
     tone: StatusTone,
     modifier: Modifier = Modifier,
     pulsing: Boolean = false,
 ) {
     val T = MaviTheme.colors
-    val container = when (tone) {
-        StatusTone.OK -> T.okSoft
-        StatusTone.PROGRESS -> T.warnSoft
-        StatusTone.NEUTRAL -> T.subtle
-    }
-    val content = when (tone) {
+    val color = when (tone) {
         StatusTone.OK -> T.ok
         StatusTone.PROGRESS -> T.warn
-        StatusTone.NEUTRAL -> T.ink2
+        StatusTone.NEUTRAL -> T.mute
     }
-    val dotColor = if (tone == StatusTone.NEUTRAL) T.mute else content
+    val dotColor = if (tone == StatusTone.NEUTRAL) T.lineStrong else color
     val dotAlpha = if (pulsing) {
         val transition = rememberInfiniteTransition(label = "status")
         val alpha by transition.animateFloat(
@@ -127,25 +123,19 @@ fun StatusPill(
         1f
     }
 
-    Row(
-        modifier = modifier
-            .clip(CircleShape)
-            .background(container)
-            .padding(start = 9.dp, end = 11.dp, top = 4.dp, bottom = 4.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
+    Row(modifier = modifier, verticalAlignment = Alignment.CenterVertically) {
         Box(
             modifier = Modifier
                 .size(7.dp)
                 .alpha(dotAlpha)
                 .background(dotColor, CircleShape),
         )
-        Spacer(modifier = Modifier.width(7.dp))
-        Text(text = label, style = MaterialTheme.typography.labelSmall, color = content)
+        Spacer(modifier = Modifier.width(8.dp))
+        Text(text = label, style = MaterialTheme.typography.labelSmall, color = color)
     }
 }
 
-/** Label on the left, value on the right. Set [mono] for addresses and other technical values. */
+/** Label on the left, value on the right, set directly on the page. Use [mono] for addresses and other technical values. */
 @Composable
 fun DetailRow(
     label: String,
@@ -157,10 +147,10 @@ fun DetailRow(
         modifier = Modifier
             .fillMaxWidth()
             .heightIn(min = 48.dp)
-            .padding(horizontal = 16.dp, vertical = 12.dp),
+            .padding(horizontal = 4.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(text = label, style = MaterialTheme.typography.bodyMedium, color = T.ink2)
+        Text(text = label, style = MaterialTheme.typography.bodyMedium, color = T.mute)
         Spacer(modifier = Modifier.width(16.dp))
         Text(
             text = value,
@@ -221,12 +211,13 @@ fun NavRow(
     title: String,
     description: String,
     onClick: () -> Unit,
+    horizontalPadding: Dp = 16.dp,
 ) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .clickable(role = Role.Button, onClick = onClick)
-            .padding(horizontal = 16.dp, vertical = 14.dp),
+            .padding(horizontal = horizontalPadding, vertical = 14.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         RowText(title = title, description = description, modifier = Modifier.weight(1f))
