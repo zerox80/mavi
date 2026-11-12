@@ -203,7 +203,7 @@ def post_install_message(binary_path: str = "mavi-vpn-gui"):
 def main():
     if not sys.platform.startswith("linux"):
         err("This script is for Linux only.")
-        err("For Windows use: python install_gui_windows.py")
+        err("For Windows, see README.md and windows/README.md for installation instructions.")
         sys.exit(1)
 
     if not GUI_DIR.exists():
