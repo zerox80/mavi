@@ -4,6 +4,7 @@ use std::process::ExitCode;
 
 mod client_config;
 mod client_credentials;
+mod client_enrollment;
 mod client_ipc;
 mod client_prompt;
 mod ipc;
@@ -52,12 +53,29 @@ async fn dispatch_cli(args: &[String]) -> Result<()> {
         "stop" => send_request(IpcRequest::Stop).await,
         "status" => send_request(IpcRequest::Status).await,
         "repair" => send_request(IpcRequest::RepairNetwork).await,
+        "enroll" => client_enrollment::run(&args[1..]).await,
+        "help" | "--help" | "-h" => {
+            print_help();
+            Ok(())
+        }
         _ => {
-            anyhow::bail!(
-                "Unknown command: {cmd}\nUsage: mavi-vpn-client [start|stop|status|repair]"
-            )
+            anyhow::bail!("Unknown command: {cmd}\nUsage: mavi-vpn-client [start|stop|status|repair]\n       mavi-vpn-client enroll <enrollment-link> [--force]")
         }
     }
+}
+
+fn print_help() {
+    println!("Usage: mavi-vpn-client [COMMAND]");
+    println!();
+    println!("Commands:");
+    println!("  start                         Start the VPN with Keycloak or a preshared key");
+    println!("  stop                          Stop the VPN");
+    println!("  status                        Show VPN status");
+    println!("  repair                        Repair stale network settings");
+    println!("  enroll <enrollment-link>      Import a one-time webpanel enrollment");
+    println!();
+    println!("Enrollment options:");
+    println!("  --force                       Replace an existing configuration without prompting");
 }
 
 #[cfg(test)]

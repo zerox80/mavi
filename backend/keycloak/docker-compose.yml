@@ -47,14 +47,18 @@ services:
       # by an existing realm. To re-import, drop the keycloak-db volume or use
       # `command: ["start", "--import-realm", "--override"]` once.
       - ./keycloak/mavi-vpn-realm.json:/opt/keycloak/data/import/mavi-vpn-realm.json:ro
-    # Uncomment the following to expose Keycloak internally if using external Nginx manually:
-    # ports:
-    #   - "127.0.0.1:8080:8080"
+    # Loopback-only HTTP for a host Nginx/Certbot reverse proxy. Traefik
+    # deployments route through the Docker network instead; binding loopback
+    # additionally is harmless there.
+    ports:
+      - "127.0.0.1:18080:8080"
     depends_on:
       - keycloak-db
     # Traefik configuration (automatically applied if Traefik is running)
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.keycloak.rule=Host(`auth.${DOMAIN_NAME}`)"
-      - "traefik.http.routers.keycloak.entrypoints=web"
+      - "traefik.http.routers.keycloak.entrypoints=${TRAEFIK_ROUTER_ENTRYPOINTS:-web}"
+      - "traefik.http.routers.keycloak.tls=${TRAEFIK_TLS_ENABLED:-false}"
+      - "traefik.http.routers.keycloak.tls.certresolver=${TRAEFIK_ACME_RESOLVER:-myresolver}"
       - "traefik.http.services.keycloak.loadbalancer.server.port=8080"

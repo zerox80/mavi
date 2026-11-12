@@ -29,7 +29,7 @@ pub(super) fn default_config_path() -> PathBuf {
     PathBuf::from(CONFIG_FILE)
 }
 
-fn load_config(path: &Path, store: &dyn SecretStore) -> Option<Config> {
+pub(super) fn load_config(path: &Path, store: &dyn SecretStore) -> Option<Config> {
     if path.exists() {
         let content = std::fs::read_to_string(path).ok()?;
         let mut config: Config = serde_json::from_str(&content).ok()?;
@@ -52,7 +52,7 @@ fn load_config(path: &Path, store: &dyn SecretStore) -> Option<Config> {
     }
 }
 
-fn save_config(config: &Config, path: &Path, store: &dyn SecretStore) -> Result<()> {
+pub(super) fn save_config(config: &Config, path: &Path, store: &dyn SecretStore) -> Result<()> {
     persist_config(config, path, &SecretAccounts::for_config(path), store)?;
     println!("Config saved to {}", path.display());
     Ok(())

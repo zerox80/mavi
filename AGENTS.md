@@ -8,6 +8,7 @@ Mavi VPN is a Rust workspace with QUIC, HTTP/3, and HTTP/2 transports.
 - `windows/`, `linux/`: platform clients and services; `quic-tester/`: transport probes.
 - `android/app/src/main/`: Kotlin app, `rust/` core, and `res/` assets.
 - `gui/src/`: JavaScript frontend; `gui/src-tauri/`: Rust integration and icons.
+- `panel/`: Keycloak-enabled web management API, static frontend, and device enrollment.
 - `scripts/tests/`: deployment/installer tests; `docs/`: documentation.
 
 ## Build, Test, and Development Commands
@@ -19,6 +20,8 @@ Use Rust 1.95+; GUI CI uses Node.js 24. Run Cargo commands from the repository r
 - `cargo test -p windows-vpn` / `cargo test -p linux-vpn`: native platform tests.
 - In `gui/`, run `npm ci`, then `npm run tauri dev` for desktop development; `npm run build` builds frontend assets.
 - `cargo test-gui-backend`: Tauri tests after building frontend assets.
+- `cargo test -p mavi-panel`: web panel API and enrollment tests.
+- `./install-server.sh`: guided Linux server setup with Docker, Nginx, certificates, and optional web panel.
 - In `gui/`: `npm test`, `npm run lint`, `npm run test:coverage`.
 - `python -m unittest discover -s scripts/tests`: installer/deployment checks.
 - In `android/`: `./gradlew testDebugUnitTest` (JUnit); use `gradlew.bat` on Windows.

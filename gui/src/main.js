@@ -3,6 +3,7 @@ import { bootstrapTauri, invoke, listen } from './api.js';
 import { wireThemeToggle, applyTheme, normalizePrefs } from './theme.js';
 import { wireSidebarSearch, renderConnectionList, migrateLegacyConfig } from './connections.js';
 import { wireModal, openModal } from './modal.js';
+import { wireEnrollment } from './enrollment.js';
 import {
   wireHero,
   refreshStatus,
@@ -24,6 +25,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   wireSidebarSearch({ openModal, applyHeroForSelection });
   wireModal({ applyHeroForSelection });
+  wireEnrollment({ applyHeroForSelection });
   wireHero();
   wireThemeToggle();
   wireShortcuts();

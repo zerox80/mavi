@@ -1,171 +1,184 @@
-# Mavi VPN - Ultimate Installation Guide
+# Mavi VPN Installation Guide
 
-This guide describes how to deploy the Mavi VPN server and connect clients. The system is designed to be highly modular: you can run just the simple VPN, or deploy the full "Enterprise" stack with Keycloak OIDC authentication and Traefik routing.
+This guide describes Linux server deployment and client installation. The server can use a static token, Keycloak OIDC, or the web panel with Keycloak.
 
----
+## 1. Linux Server Installation
 
-## 1. Server Installation (Docker Compose)
+### Guided installation
 
-The backend is fully dockerized for Linux servers.
-
-For the prebuilt server image and a minimal Compose deployment, use
-[`docker/server/`](../docker/server/README.md). The steps below build the server
-locally and also cover the optional Keycloak/Traefik stack.
-
-### Prerequisites
-* **Docker** and **Docker Compose** installed.
-* Ports open in your firewall:
-  * `10443/UDP` (For the QUIC VPN tunnel; use the value from `VPN_PORT`)
-  * `TCP` port from `VPN_HTTP2_BIND_ADDR` when HTTP/2 mode is enabled
-  * `80/TCP` & `443/TCP` (If using standalone Traefik)
-
-### Step 1: Prepare the Configuration
-Clone the repository and prepare the environment file:
-```bash
-cd mavi-vpn/backend
-cp .env.example .env
-nano .env
-```
-
-### Step 2: The Critical `.env` Settings
-Depending on your needs, configure the `.env` file exactly as follows:
-
-**1. Basic Settings (Required for all modes)**
-* `VPN_AUTH_TOKEN`: A secure, long password. Required unless `VPN_KEYCLOAK_ENABLED=true`; the server refuses empty or example/default values in static-token mode.
-* `VPN_PORT`: e.g. `10443`.
-
-**Optional HTTP/2 CONNECT-IP transport:**
-```dotenv
-VPN_HTTP2_BIND_ADDR=0.0.0.0:10443
-```
-This enables a separate TLS/TCP listener using ALPN `h2`. It may use the same
-numeric port as the UDP QUIC listener. Select **HTTP/2 framing** in the client
-and point the client at the TCP endpoint. HTTP/2 mode is mutually exclusive
-with censorship-resistant mode, HTTP/3 framing, and ECH.
-
-**2. Enterprise Mode (Keycloak + Traefik)**
-If you want the web-based Admin UI and user management, you **must** configure these variables to avoid startup errors:
-* `DOMAIN_NAME=yourdomain.com` *(Crucial! Traefik uses this to build routes like `auth.yourdomain.com`)*
-* `VPN_KEYCLOAK_URL=https://auth.yourdomain.com` *(Must be reachable by VPN clients)*
-* `KEYCLOAK_DB_PASSWORD=<long-random-database-password>`
-* `KEYCLOAK_ADMIN_PASS=<long-random-admin-password>`
-* `COMPOSE_FILE=docker-compose.yml:keycloak/docker-compose.yml` *(Uncomment this to load Keycloak)*
-* `COMPOSE_PROFILES=traefik,keycloak` *(Crucial! Instructs Docker to actually start these services)*
-
-**3. SSL Routing Strategies**
-Choose **one** of the following strategies if you enabled the Enterprise Mode:
-
-▶ **Option A: Standalone (Traefik handles SSL)**
-Use this if no other web server is running on your host.
-* `TRAEFIK_HTTP_PORT=80`
-* `TRAEFIK_HTTPS_PORT=443`
-* `TRAEFIK_ACME_RESOLVER=myresolver` (Fetches free Let's Encrypt certificates).
-
-▶ **Option B: Behind Nginx (You already have Wildcard SSL)**
-Use this if you already run Nginx/Apache on Port 443.
-* `TRAEFIK_HTTP_PORT=11443` (Traefik runs internally on this port).
-* `TRAEFIK_HTTPS_PORT=11444` (Dummy port to prevent conflicts).
-* `TRAEFIK_ACME_RESOLVER=` (Leave empty! Traefik internal SSL is disabled).
-* Check out [`docs/NGINX_PROXY.md`](NGINX_PROXY.md) for the exact Nginx `location /` configuration to proxy traffic to port 11443.
-
-**4. Performance Tuning (Critical for High-Speed)**
-* `VPN_MTU=1280`: **(Default)** This sets the TUN adapter payload size. The
-  allowed range is `1280..=1360`; for QUIC transports the outer payload MTU is
-  derived as `VPN_MTU + 80`. HTTP/2 uses TLS/TCP and has no QUIC payload MTU.
-* **Socket Buffers**: The system now automatically requests **4MB** of OS-level UDP buffer space on both the server and client to prevent packet loss during high-speed bursts (GSO).
-
-### Step 3: Start the Server
+Use a repository checkout on a Linux server with Python 3. Run the launcher from the repository root:
 
 ```bash
-docker compose pull --ignore-buildable
-docker compose build --pull --no-cache vpn-server
-docker compose up -d --force-recreate
+./install-server.sh
 ```
 
-`docker compose pull` only updates registry images such as Traefik and Keycloak.
-The VPN server is built locally from Rust sources, and the Quinn/H3 forks are
-Git dependencies resolved during the Docker build. Use `--no-cache` when those
-forks have new commits so Cargo fetches the current branch heads instead of
-reusing Docker's cached dependency layer.
+The installer presents these choices:
 
-> **⏳ Important:** Keycloak is a large Java application. Once you run the command above, give the server **1 to 2 minutes** to initialize the database and UI. If you access `auth.yourdomain.com` too early, you will see a `502 Bad Gateway` error. Just wait and refresh!
+```text
+1) Web panel + Keycloak (Recommended)
+2) Classic token setup
+3) Advanced: Keycloak only
+```
 
-### Step 4: Configure Keycloak (Enterprise Mode Only)
-The Keycloak container ships with a **pre-configured realm import** (`backend/keycloak/mavi-vpn-realm.json`) that is applied automatically on first start (empty database). It creates everything the VPN needs — you no longer have to set up the realm or client manually.
+The modes have different authentication behavior:
 
-**What gets imported automatically on first start:**
-- Realm **`mavi-vpn`** (enabled, `sslRequired: external`, brute-force protection on)
-- Client **`mavi-client`** — public PKCE client (`S256`), standard flow enabled, redirect URIs `http://127.0.0.1:18923/callback` (desktop clients) and `com.mavi.vpn://oauth/callback` (Android debug builds)
-- Realm role **`vpn-user`** — optional, only enforced when `VPN_KEYCLOAK_REQUIRED_ROLE=vpn-user` is set on the server (off by default)
-- Token lifespans tuned for the VPN refresh cycle:
-  - **Access Token Lifespan: 10 min (600 s)** — gives the client's 300 s refresh skew real headroom
-  - **SSO Session Idle Timeout: 1 h (3600 s)** — survives brief network outages and laptop sleep
-  - **SSO Session Max Lifespan: 24 h (86400 s)** — upper bound on a refresh-token chain
+- **Web panel + Keycloak:** The installer always enables Keycloak, even if an earlier configuration contained `VPN_KEYCLOAK_ENABLED=false`. It creates the panel database, Keycloak client, roles, and optional initial administrator. VPN clients use Keycloak and do not need `VPN_AUTH_TOKEN`.
+- **Classic token setup:** The installer generates a static `VPN_AUTH_TOKEN`. Configure the token/PSK and certificate PIN manually on each client. This mode does not require MFA or Keycloak.
+- **Keycloak only:** The installer enables the existing Keycloak realm and `mavi-client` flow without installing the panel. Create and manage VPN users in the Keycloak Administration Console as before.
 
-**The only remaining manual step — create your users:**
-1. Open your browser and navigate to `https://auth.yourdomain.com/`.
-2. Click **Administration Console** and log in with `admin` and the `KEYCLOAK_ADMIN_PASS` value from your `.env`.
-3. Make sure the realm selector (top-left) is on **`mavi-vpn`** (not `master`).
-4. On the left menu, click **Users** -> **Add user**.
-   - Create a user for yourself.
-   - Go to the **Credentials** tab and set a password for this user (turn off "Temporary").
-5. *(Optional)* If you enable `VPN_KEYCLOAK_REQUIRED_ROLE=vpn-user` on the server, go to the **Role mapping** tab of each user and assign the `vpn-user` role. With the default config (policy off) this is not required.
+An existing `backend/.env` selects the existing mode instead of showing the mode menu. The installer does not switch that mode, regenerate existing secrets, or replace certificates and private keys. Missing required secrets are generated once with Python's `secrets` module. The inner TUN MTU is always `VPN_MTU=1280`; there are no MTU tests, MTU prompts, or PMTUD setup steps.
 
-> **Idempotent restarts:** The import only runs when the Keycloak database is empty (first start). Subsequent restarts skip the import, so manual changes in the admin console are preserved. To force a re-import, stop the stack, delete the `keycloak-db` container's data volume (`./data/postgres`), and start again — or temporarily change `command` in `backend/keycloak/docker-compose.yml` to `["start", "--import-realm", "--override"]` for a one-time override.
+Before applying changes, the installer shows a summary and runs read-only checks for Linux, distribution, CPU architecture, memory, free storage, Docker and the `docker compose` plugin, `/dev/net/tun`, host addresses, relevant ports, and DNS names. DNS and address inspection do not use ping and do not prove public reachability. Missing distribution packages are installed only after a separate confirmation that displays the exact commands; the installer never executes a downloaded shell script.
 
-> **Existing deployments:** If you already created the `mavi-vpn` realm manually, the import will be skipped and your existing configuration is left untouched. To pick up the tuned token lifespans from the import, either apply them manually in the Keycloak admin console (Realm Settings → Tokens) or re-import with `--override` after backing up your users.
+To run only the checks, without writing `.env`, installing packages, or changing containers:
 
-### Step 5: Retrieve the Certificate PIN
-For the VPN client to connect securely via QUIC or HTTP/2 without MITM attacks, you need the server's unique Certificate PIN:
 ```bash
+./install-server.sh --check
+```
+
+Non-interactive installation uses the same defaults and requires explicit confirmation with `--yes`:
+
+```bash
+./install-server.sh --non-interactive --mode panel --domain example.com --acme-email admin@example.com --create-admin --yes
+./install-server.sh --non-interactive --mode panel --domain example.com --proxy external --create-admin --admin-email admin@example.com --yes
+./install-server.sh --non-interactive --mode classic --yes
+./install-server.sh --non-interactive --mode keycloak --domain example.com --acme-email admin@example.com --yes
+```
+
+Use `--proxy external` instead of an ACME email when an existing reverse proxy instance terminates TLS. `--proxy` also accepts `nginx` (default) and `traefik` (legacy standalone). Use `--no-start` to write only the configuration. A new non-interactive installation needs `--mode`; Keycloak and panel modes also need `--domain`.
+
+### Configuration and secret storage
+
+The installer works in `backend/` and writes `backend/.env` atomically with mode `0600`. It changes an existing file only when effective settings are missing or need correction. Before such a change, it stores the previous file with mode `0600` in `backend/data/env-backups/`; an unchanged rerun creates no backup. The backup directory is mode `0700` and is covered by the existing `backend/data/` Git ignore rule.
+
+Do not post `.env`, its backups, private keys, Keycloak responses, access tokens, or password-reset output. The installer prints only a newly generated temporary panel-admin password, and only when it creates that user.
+
+The selected Compose files are stored in `.env`:
+
+| Mode | `COMPOSE_FILE` |
+| --- | --- |
+| Classic | `docker-compose.yml` |
+| Keycloak only | `docker-compose.yml:keycloak/docker-compose.yml` |
+| Web panel | `docker-compose.yml:keycloak/docker-compose.yml:panel/docker-compose.yml` |
+
+Panel mode also sets `MAVI_WEB_PANEL_ENABLED=true`, forces `VPN_KEYCLOAK_ENABLED=true`, and defaults `VPN_KEYCLOAK_REQUIRED_ROLE` to `vpn-user`. `MAVI_PANEL_VPN_ENDPOINT` is written explicitly because nested Compose interpolation is not portable. Keycloak and the panel always publish loopback-only HTTP ports (`127.0.0.1:18080` and `127.0.0.1:18081`) for the reverse proxy.
+
+### Reverse proxy modes
+
+Keycloak and panel subdomains can be served in three ways. New installations default to host Nginx.
+
+#### Host Nginx with Let's Encrypt (default)
+
+The installer installs the `nginx` and `certbot` system packages after showing them and asking for confirmation, writes an Mavi site configuration, requests Let's Encrypt certificates with `certbot --nginx`, and enables HTTP-to-HTTPS redirection and the renewal timer. Create DNS records for `auth.<domain>` and, when enabled, `panel.<domain>` that point to this server before running the installer; the installer warns when the names do not resolve.
+
+Nginx terminates HTTPS publicly and forwards to the loopback HTTP ports that Keycloak (`127.0.0.1:18080`) and the panel (`127.0.0.1:18081`) publish. No `COMPOSE_PROFILES` value and no `TRAEFIK_*` variables are written in this mode. If Nginx setup fails, the `.env` file remains written and the installer reports which step to fix before rerunning.
+
+Open these firewall ports:
+
+- `10443/UDP`, or the configured `VPN_PORT`, for QUIC and HTTP/3 VPN transport.
+- `80/TCP` and `443/TCP` for Nginx and Let's Encrypt.
+- The TCP port in `VPN_HTTP2_BIND_ADDR` when the optional HTTP/2 transport is enabled. It may use the same numeric port as UDP.
+
+The installer does not verify public firewall or NAT reachability. A successful local port bind and DNS lookup do not replace an external connection test.
+
+#### External reverse proxy
+
+Choose `--proxy external` when an existing reverse proxy terminates TLS. Forward `auth.<domain>` to `http://127.0.0.1:18080` and, when enabled, forward `panel.<domain>` directly to `http://127.0.0.1:18081`. Pass the original host, HTTPS scheme, client IP, and WebSocket headers.
+
+For the panel, set `X-Mavi-Proxy-Token` to the value of `MAVI_PANEL_PROXY_TOKEN` from the protected `backend/.env`, replacing any incoming value. Set `X-Forwarded-For` to the client IP observed by the proxy, or append that IP as the final address. Keep the token in a private proxy configuration file. Managed Nginx and standalone Traefik configure these headers automatically.
+
+#### Legacy standalone Traefik
+
+The installer saves the proxy selection as `MAVI_PROXY_MODE` and reuses it on subsequent runs. For older configurations, `TRAEFIK_BIND_ADDR=0.0.0.0` selects standalone Traefik. A loopback bind or a legacy Traefik profile with no explicit bind selects external proxy mode and retains the Traefik profile. Older configurations with an ACME email and no Traefik settings keep managed Nginx. Other unmarked configurations default to external proxy mode.
+
+### Keycloak and panel bootstrap
+
+The Keycloak container imports `mavi-vpn` and the public `mavi-client` PKCE client on an empty database. Keycloak-only mode keeps the manual user-management flow. Its optional `VPN_KEYCLOAK_REQUIRED_ROLE` remains unchanged unless it was absent from a new configuration.
+
+For panel mode, the installer starts the VPN, Keycloak database, and Keycloak first (plus Traefik only in the legacy Traefik mode). It then waits for the master-admin login and imported realm and uses the Keycloak Admin REST API before starting the panel. The bootstrap performs these idempotent operations:
+
+- Creates or updates the `panel-admin`, `panel-user`, and `vpn-user` realm roles.
+- Configures the confidential `mavi-panel` client with the sole redirect URI `https://panel.<domain>/auth/callback`, authorization-code flow with PKCE S256, and implicit and direct grants disabled.
+- Adds a realm-role mapper that includes the complete realm-role set in access and ID tokens.
+- Adds `panel-user` and `vpn-user` to the realm's default roles for new users without deleting existing role mappings.
+- Optionally creates the initial administrator with a random temporary password and assigns `panel-admin`, `panel-user`, and `vpn-user`. An existing administrator keeps their password and current roles; the bootstrap adds only missing required roles.
+
+An existing Keycloak client secret is never reset. If the installer generated a new `.env` secret for an already existing panel client, it adopts the existing Keycloak secret into the protected `.env`. If an explicitly stored `.env` secret does not match, bootstrap stops without changing the Keycloak secret.
+
+The bootstrap can be repeated safely after a failed first start:
+
+```bash
+cd /path/to/mavi-vpn
+python3 scripts/server_installer/keycloak_bootstrap.py --env-file backend/.env
+```
+
+To create the initial administrator later, append `--create-admin --admin-username panel-admin --admin-email admin@example.com`. Repeating this command for an existing username does not reset the password. After a successful manual bootstrap, start the panel with `cd backend && docker compose up -d`.
+
+### Starting and restarting
+
+The installer performs the initial build and ordered start. After it finishes, restart the complete selected stack from `backend/` with exactly:
+
+```bash
+cd /path/to/mavi-vpn/backend
+docker compose up -d
+```
+
+Do not add `--profile` or `-f`: Docker Compose reads `COMPOSE_FILE` and `COMPOSE_PROFILES` automatically from `backend/.env`. This command also starts the panel dependencies after the one-time bootstrap has completed. To rebuild local images after a source update, run `docker compose build --pull` before `docker compose up -d`.
+
+If an existing panel installation has no `MAVI_PANEL_PROXY_TOKEN`, rerun `./install-server.sh` from the repository root when upgrading. The installer generates the token and updates managed Nginx. For an external reverse proxy, apply the panel headers described in [External reverse proxy](#external-reverse-proxy) and forward the panel hostname directly to its loopback port so the rate limiter uses each client's IP.
+
+### Client credentials
+
+For classic mode, read the generated token and certificate PIN on the server and enter them manually in the client:
+
+```bash
+cd /path/to/mavi-vpn/backend
+grep '^VPN_AUTH_TOKEN=' .env
 cat data/cert_pin.txt
 ```
 
-### Step 6: IPv6 Networking (Host Setup)
-The VPN gives clients internal ULA IPv6 addresses from `fd00::/64` and routes their traffic out via **NAT66**. The container is intentionally hardened (non-privileged, `cap_drop: ALL` + `NET_ADMIN`), so its `/proc/sys` is **read-only** and it cannot enable kernel forwarding itself — you must enable it **on the host** (just like IPv4 forwarding). If the host has public IPv6 but forwarding is off, the container fails loudly at startup with the exact commands to run.
+When censorship-resistant mode uses ECH, the optional client value is in `data/ech_config_hex.txt`. Panel mode distributes the endpoint, certificate PIN, transport, ECH configuration, Keycloak realm, and MTU through its enrollment flow; the static token is not used.
 
-**1. Enable forwarding now (current boot):**
+For Keycloak-only mode, open `https://auth.<domain>/`, sign in to the Administration Console with `KEYCLOAK_ADMIN_USER` and `KEYCLOAK_ADMIN_PASS`, select the `mavi-vpn` realm, and create users there. The imported `mavi-client` uses PKCE S256 and the existing desktop and Android callback URIs. Assign `vpn-user` when `VPN_KEYCLOAK_REQUIRED_ROLE=vpn-user` is configured.
+
+Certificates, ECH keys, and the VPN private key persist in `backend/data/`. The installer never regenerates them. Back up this directory before deleting containers or volumes.
+
+### Host forwarding and IPv6
+
+The VPN gives clients IPv4 addresses and internal ULA IPv6 addresses from `fd00::/64`, then uses NAT on the host network. Enable forwarding on the host because the hardened container cannot change host sysctls:
+
 ```bash
 sudo sysctl -w net.ipv4.ip_forward=1
 sudo sysctl -w net.ipv6.conf.all.forwarding=1
 ```
 
-**2. On RA-based clouds (e.g. AWS Lightsail), keep accepting Router Advertisements on the WAN while forwarding is enabled** — otherwise enabling forwarding makes Linux drop the IPv6 default route:
-```bash
-WAN=$(ip route get 8.8.8.8 | awk '{print $5; exit}')
-sudo sysctl -w "net.ipv6.conf.${WAN}.accept_ra=2"
-echo "WAN interface: $WAN"
-```
+On RA-based clouds such as AWS Lightsail, allow Router Advertisements on the WAN interface while forwarding is enabled, then persist the settings:
 
-**3. Persist it across reboots (recommended)** so you never have to touch the host again. This writes `/etc/sysctl.d/99-mavi-vpn.conf` with your WAN interface filled in automatically — files in `/etc/sysctl.d/` are re-applied by the kernel on **every boot**, so the settings survive reboots and instance restarts:
 ```bash
 WAN=$(ip route get 8.8.8.8 | awk '{print $5; exit}')
 sudo tee /etc/sysctl.d/99-mavi-vpn.conf >/dev/null <<CONF
-# Mavi VPN — host forwarding for VPN clients (loaded automatically on every boot)
 net.ipv4.ip_forward = 1
 net.ipv6.conf.all.forwarding = 1
-# Keep the RA-derived IPv6 default route on RA-based clouds (e.g. AWS Lightsail).
 net.ipv6.conf.${WAN}.accept_ra = 2
 net.ipv6.conf.default.accept_ra = 2
 CONF
 sudo sysctl --system
 ```
-The heredoc is intentionally **unquoted** (`<<CONF`, not `<<'CONF'`), so `${WAN}` is expanded into the file — no hand-editing of the interface name. Then confirm it persisted (this re-reads only that file, exactly as the kernel does at boot):
+
+Do not set `VPN_NETWORK_V6` to a provider-assigned public prefix. For an intentionally IPv4-only deployment, set `VPN_DISABLE_IPV6=true`; this also skips the startup wait for a global IPv6 address.
+
+Inspect startup and routing failures without dumping secrets:
+
 ```bash
-cat /etc/sysctl.d/99-mavi-vpn.conf
-sudo sysctl -p /etc/sysctl.d/99-mavi-vpn.conf   # should print forwarding=1 and accept_ra=2
+cd /path/to/mavi-vpn/backend
+docker compose ps
+docker compose logs vpn-server
+docker compose logs keycloak
+docker compose logs panel
+cat /proc/sys/net/ipv4/ip_forward
+cat /proc/sys/net/ipv6/conf/all/forwarding
 ```
 
-> **IPv4-only deployments:** If you don't want IPv6, set `VPN_DISABLE_IPV6=true` in `.env`. The server then skips IPv6 setup entirely (and the startup wait). Hosts with IPv6 fully disabled in the kernel are detected automatically and run IPv4-only without any error. `VPN_IPV6_WAIT` (default `30`) controls how long the entrypoint waits for the WAN's global IPv6 address to appear before continuing.
-
-> **Important:** Do **not** assign your provider's public IPv6 prefix (e.g. a `/128` or `/64` such as `2a05:…`) to `VPN_NETWORK_V6`. Keep the ULA `fd00::/64`; outbound IPv6 for clients works through NAT66.
-
-After enabling forwarding on the host, (re)start the stack and confirm IPv6 is healthy:
-```bash
-docker compose up -d --force-recreate
-docker compose logs vpn-server | grep -A12 'IPv6 diagnostics'
-cat /proc/sys/net/ipv6/conf/all/forwarding   # expect: 1
-```
 ---
 
 ## 2. Windows Client Installation

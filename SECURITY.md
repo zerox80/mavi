@@ -41,8 +41,8 @@ Reports around these areas are especially welcome:
 * Windows routing and DNS rules
 * Linux route cleanup
 * QUIC transport edge cases
-* HTTP/2 CONNECT-IP parsing, capsule handling, TLS/TCP listener exposure, or
-  reauthentication behavior
+* HTTP/2 CONNECT-IP parsing, capsule handling, TLS/TCP listener exposure, or reauthentication behavior
+* Web panel OIDC login, role checks, enrollment ticket redemption, CSRF protection, and reverse-proxy configuration
 * anything that could leak traffic outside the tunnel
 
 ## Operational trust boundaries
@@ -74,6 +74,8 @@ The optional Traefik profile mounts `/var/run/docker.sock` read-only. That is
 convenient for local demos, but Docker socket access is still a powerful host
 trust boundary; production deployments should prefer a socket proxy or an
 externally managed reverse proxy.
+
+The optional web panel runs as a separate unprivileged management service without the Docker socket, host networking, or TUN access. Enrollment tickets expire after 15 minutes and can be redeemed once; they contain connection metadata rather than Keycloak access or refresh tokens. Deleting a device from the panel removes its inventory entry and pending ticket but does not disconnect an existing VPN session or revoke a user's Keycloak sessions. Keycloak administrators should use MFA and review `panel-admin` assignments separately from `vpn-user` assignments.
 
 ## Out of scope
 

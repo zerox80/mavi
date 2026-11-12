@@ -1,5 +1,6 @@
 mod config;
 mod daemon_credentials;
+mod enrollment;
 mod secrets;
 
 use crate::{daemon, vpn_core};
@@ -55,6 +56,7 @@ pub fn run() {
         "start" => config_path(&args).and_then(run_ipc_start),
         "stop" => config_path(&args).and_then(run_ipc_stop),
         "repair" => run_repair(&args[1..]),
+        "enroll" => enrollment::run(&args[1..]),
 
         "status" => {
             run_status();
@@ -345,6 +347,7 @@ fn print_help() {
     println!("  start                 Send connect to running daemon");
     println!("  stop                  Send disconnect to running daemon");
     println!("  repair                Repair stale routes/DNS via daemon");
+    println!("  enroll <link>         Import a one-time webpanel enrollment");
     println!();
     println!("Other:");
     println!("  status                Check VPN status");
@@ -352,6 +355,7 @@ fn print_help() {
     println!();
     println!("Options:");
     println!("  -c, --config <FILE>   Path to config file (default: mavi-vpn.json)");
+    println!("      --force           Replace an existing config during enrollment");
     println!();
     println!("Environment:");
     println!("  RUST_LOG=debug        Enable debug logging");
@@ -360,6 +364,7 @@ fn print_help() {
     println!("  sudo mavi-vpn                      # Interactive connect");
     println!("  sudo mavi-vpn daemon &             # Start daemon in background");
     println!("  mavi-vpn start -c my-config.json   # Connect via daemon");
+    println!("  mavi-vpn enroll <link>             # Import a webpanel profile");
     println!("  mavi-vpn stop                      # Disconnect via daemon");
 }
 

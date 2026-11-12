@@ -56,7 +56,6 @@ fun HomeView(
     val censorshipResistant by viewModel.censorshipResistant.collectAsState()
     val http3Framing by viewModel.http3Framing.collectAsState()
     val http2Framing by viewModel.http2Framing.collectAsState()
-    val hasKeycloakRefreshToken = viewModel.hasSavedKeycloakRefreshToken()
 
     val isConnected = connectionState == VpnConnectionState.CONNECTED
     val isConnecting = connectionState == VpnConnectionState.CONNECTING ||
@@ -99,9 +98,8 @@ fun HomeView(
                 viewModel.updateErrorMessage("Please enter a server endpoint in Config.")
                 onGoToConfig()
             } else if (useKeycloak) {
-                val hasKeycloakSession = authToken.isNotEmpty() || hasKeycloakRefreshToken
-                if (kcUrl.isEmpty() || !hasKeycloakSession) {
-                    viewModel.updateErrorMessage("Please login with Keycloak first in Config.")
+                if (kcUrl.isEmpty()) {
+                    viewModel.updateErrorMessage("Please configure Keycloak in Config.")
                     onGoToConfig()
                 } else {
                     viewModel.saveKeycloakDetails()

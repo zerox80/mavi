@@ -13,8 +13,8 @@ mod storage;
 mod tray;
 
 use commands::{
-    load_config, load_prefs, save_config, save_prefs, vpn_connect, vpn_disconnect,
-    vpn_repair_network, vpn_status,
+    import_enrollment, load_config, load_prefs, redeem_enrollment, save_config, save_prefs,
+    vpn_connect, vpn_disconnect, vpn_repair_network, vpn_status,
 };
 use tray::{setup_tray, start_status_poller};
 
@@ -36,6 +36,8 @@ pub fn run() {
             vpn_disconnect,
             vpn_repair_network,
             vpn_status,
+            redeem_enrollment,
+            import_enrollment,
             save_config,
             load_config,
             load_prefs,

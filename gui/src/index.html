@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Mavi VPN</title>
     <link rel="stylesheet" href="style.css" />
+    <link rel="stylesheet" href="enrollment.css" />
   </head>
   <body>
     <div id="app">
@@ -54,7 +55,7 @@
 
         <div id="connection-list"></div>
 
-        <footer class="sidebar-foot">
+        <footer class="sidebar-foot add-conn-actions">
           <button id="add-conn-btn" class="btn btn-secondary btn-block">
             <svg viewBox="0 0 16 16" fill="none" aria-hidden="true">
               <path
@@ -66,6 +67,7 @@
             </svg>
             Add connection
           </button>
+          <button id="enroll-conn-btn" class="btn btn-secondary">Enroll</button>
         </footer>
       </aside>
 
@@ -210,6 +212,48 @@
           <button id="modal-delete" class="btn btn-danger hidden">Delete</button>
           <button id="modal-cancel" class="btn btn-secondary">Cancel</button>
           <button id="modal-save" class="btn btn-primary">Save</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- One-time webpanel enrollment modal -->
+    <div id="enroll-backdrop">
+      <div id="enroll-modal" role="dialog" aria-modal="true" aria-labelledby="enroll-title">
+        <h3 id="enroll-title">Enroll Connection</h3>
+        <div id="enroll-link-step" class="form">
+          <div class="field">
+            <label for="enroll-link">Enrollment link</label>
+            <input
+              type="text"
+              id="enroll-link"
+              class="mono"
+              autocomplete="off"
+              placeholder="https://panel.example.com/enroll/…"
+            />
+          </div>
+          <p class="enroll-help">
+            The ticket is redeemed when you select Review. No profile is saved until you confirm the
+            returned settings.
+          </p>
+        </div>
+        <div id="enroll-confirm-step" class="form hidden">
+          <div class="enroll-summary">
+            <div><span>LABEL</span><strong id="enroll-label"></strong></div>
+            <div><span>ENDPOINT</span><strong id="enroll-endpoint"></strong></div>
+            <div><span>KEYCLOAK URL</span><strong id="enroll-keycloak"></strong></div>
+            <div><span>REALM</span><strong id="enroll-realm"></strong></div>
+            <div><span>CLIENT ID</span><strong id="enroll-client"></strong></div>
+            <div><span>CERTIFICATE PIN</span><strong id="enroll-pin"></strong></div>
+          </div>
+          <p class="enroll-help">
+            This creates a separate saved connection. Your current VPN session is not changed.
+          </p>
+        </div>
+        <div id="enroll-error" class="enroll-error hidden" role="alert"></div>
+        <div class="actions">
+          <button id="enroll-cancel" class="btn btn-secondary">Cancel</button>
+          <button id="enroll-redeem" class="btn btn-primary">Review</button>
+          <button id="enroll-import" class="btn btn-primary hidden">Save Connection</button>
         </div>
       </div>
     </div>

@@ -59,7 +59,7 @@ services:
       - "--providers.docker.exposedbydefault=false"
       # Entry points
       - "--entrypoints.web.address=:80"
-      - "--entrypoints.web.forwardedHeaders.insecure=true"
+      - "--entrypoints.web.forwardedHeaders.insecure=${TRAEFIK_FORWARDED_HEADERS_INSECURE:-true}"
       - "--entrypoints.websecure.address=:443"
       # (REMOVED) Global HTTP -> HTTPS Redirect (Nginx handles SSL)
       # Let's Encrypt Resolver
@@ -69,8 +69,8 @@ services:
       # Logging
       - "--log.level=INFO"
     ports:
-      - "127.0.0.1:${TRAEFIK_HTTP_PORT:-80}:80"
-      - "127.0.0.1:${TRAEFIK_HTTPS_PORT:-443}:443"
+      - "${TRAEFIK_BIND_ADDR:-127.0.0.1}:${TRAEFIK_HTTP_PORT:-80}:80"
+      - "${TRAEFIK_BIND_ADDR:-127.0.0.1}:${TRAEFIK_HTTPS_PORT:-443}:443"
       # Dashboard (Optional, insecure unless protected)
       # - "8080:8080"
     volumes:

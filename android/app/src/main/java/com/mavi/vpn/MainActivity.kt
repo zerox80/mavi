@@ -22,6 +22,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.lifecycleScope
+import com.mavi.vpn.ui.screens.EnrollmentDialog
 import com.mavi.vpn.ui.screens.SettingsScreen
 import com.mavi.vpn.ui.screens.SplitTunnelingScreen
 import com.mavi.vpn.ui.screens.VpnScreen
@@ -153,6 +154,7 @@ class MainActivity : ComponentActivity() {
                         )
                         else -> currentScreen = "home"
                     }
+                    EnrollmentDialog(viewModel = viewModel)
                 }
             }
         }
@@ -177,13 +179,27 @@ class MainActivity : ComponentActivity() {
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
+        setIntent(intent)
         handleIntent(intent)
     }
 
     private fun handleIntent(intent: Intent) {
-        val data: Uri? = intent.data
-        if (data != null && OAuthHelper.isOAuthRedirect(data)) {
-            intent.setData(null)
+        val data: Uri = intent.data ?: return
+        when (val route = EnrollmentDeepLink.parse(data.toString())) {
+            is EnrollmentRoute.Valid -> {
+                consumeIntentData(intent)
+                viewModel.startEnrollment(route.request)
+                return
+            }
+            is EnrollmentRoute.Invalid -> {
+                consumeIntentData(intent)
+                viewModel.showEnrollmentError(route.message)
+                return
+            }
+            EnrollmentRoute.NotEnrollment -> Unit
+        }
+        if (OAuthHelper.isOAuthRedirect(data)) {
+            consumeIntentData(intent)
 
             val oauthError = data.getQueryParameter("error")
             if (oauthError != null) {
@@ -235,6 +251,11 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
+    }
+
+    private fun consumeIntentData(intent: Intent) {
+        intent.data = null
+        setIntent(intent)
     }
 
     private fun startVpnService(

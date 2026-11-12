@@ -1,8 +1,9 @@
 use crate::secret_store::{
-    connection_refresh_token_account, connection_token_account, keycloak_credential_id,
-    legacy_config_token_account, KeyringSecretStore, SecretStore,
+    connection_refresh_token_account, connection_token_account, keycloak_base_url,
+    keycloak_credential_id, legacy_config_token_account, KeyringSecretStore, SecretStore,
 };
 use serde::Deserialize;
+use shared::enrollment::EnrollmentProfile;
 use shared::ipc::Config;
 use std::path::Path;
 
@@ -314,6 +315,75 @@ fn save_prefs_with_writer(
     stored.cleanup(&prefs_path, store, &mut write);
 
     Ok(())
+}
+
+pub(crate) fn import_enrollment_to_dir(
+    config_dir: &Path,
+    profile: EnrollmentProfile,
+) -> Result<Prefs, String> {
+    import_enrollment_to_dir_with_store(config_dir, profile, &KeyringSecretStore)
+}
+
+fn import_enrollment_to_dir_with_store(
+    config_dir: &Path,
+    profile: EnrollmentProfile,
+    store: &dyn SecretStore,
+) -> Result<Prefs, String> {
+    profile.validate()?;
+    // The read/append/write sequence must be atomic with respect to editor saves
+    // and deferred credential cleanup. A fresh ID isolates all future OAuth
+    // credentials from both the panel device ID and every existing profile.
+    let _guard = PREFS_LOCK.lock().map_err(|e| e.to_string())?;
+    let mut prefs = load_prefs_from_dir_with_store(config_dir, store)?;
+    let id = loop {
+        let id = format!("{:032x}", rand::random::<u128>());
+        if !prefs
+            .connections
+            .iter()
+            .any(|connection| connection.id == id)
+        {
+            break id;
+        }
+    };
+    let connection = saved_conn_from_enrollment(profile, id)?;
+    let active_id = connection.id.clone();
+    prefs.connections.push(connection);
+    prefs.active_id = Some(active_id);
+    save_prefs_to_dir_with_store(config_dir, &mut prefs, store)?;
+    Ok(prefs)
+}
+
+fn saved_conn_from_enrollment(profile: EnrollmentProfile, id: String) -> Result<SavedConn, String> {
+    let label = profile.label.trim().to_string();
+    let config = profile.into_config()?;
+    let kc_url = config
+        .kc_url
+        .as_deref()
+        .map(keycloak_base_url)
+        .transpose()?;
+    let mut connection = SavedConn {
+        id,
+        label,
+        endpoint: config.endpoint.trim().to_string(),
+        token: None,
+        cert_pin: config
+            .cert_pin
+            .split(',')
+            .map(str::trim)
+            .collect::<Vec<_>>()
+            .join(","),
+        ech_config: config.ech_config,
+        http3_framing: config.http3_framing,
+        http2_framing: config.http2_framing,
+        censorship_resistant: config.censorship_resistant,
+        kc_auth: Some(true),
+        kc_url,
+        kc_realm: config.kc_realm,
+        kc_client_id: config.kc_client_id,
+        vpn_mtu: config.vpn_mtu,
+    };
+    connection.normalize_transport();
+    Ok(connection)
 }
 
 #[cfg(test)]

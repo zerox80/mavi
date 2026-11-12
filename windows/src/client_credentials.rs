@@ -21,7 +21,7 @@ where
     prepare().await
 }
 
-fn ensure_can_start(response: IpcResponse) -> Result<()> {
+pub(crate) fn ensure_can_start(response: IpcResponse) -> Result<()> {
     match response {
         IpcResponse::Status {
             state: crate::ipc::VpnState::Stopped | crate::ipc::VpnState::Failed,

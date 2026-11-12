@@ -2,6 +2,7 @@ package com.mavi.vpn.data
 
 import android.content.Context
 import android.content.SharedPreferences
+import com.mavi.vpn.EnrollmentProfile
 
 private const val DEFAULT_VPN_MTU = 0
 private const val MIN_VPN_MTU = 1280
@@ -9,11 +10,15 @@ private const val MAX_VPN_MTU = 1360
 
 internal fun sanitizeVpnMtu(value: Int): Int = if (value == DEFAULT_VPN_MTU || value in MIN_VPN_MTU..MAX_VPN_MTU) value else DEFAULT_VPN_MTU
 
-class PrefsManager(
-    context: Context,
+class PrefsManager internal constructor(
+    private val prefs: SharedPreferences,
+    private val secrets: SecureStringPreferences,
 ) {
-    private val prefs: SharedPreferences = context.getSharedPreferences("MaviVPN", Context.MODE_PRIVATE)
-    private val secrets = SecureStringPreferences(prefs)
+    constructor(context: Context) : this(
+        context.getSharedPreferences("MaviVPN", Context.MODE_PRIVATE),
+        SecureStringPreferences(context.getSharedPreferences("MaviVPN", Context.MODE_PRIVATE)),
+    )
+
     internal val keycloak = KeycloakSessionPreferences(prefs, secrets)
 
     var savedIp: String
@@ -83,6 +88,24 @@ class PrefsManager(
     var savedVpnMtu: Int
         get() = sanitizeVpnMtu(prefs.getInt("saved_vpn_mtu", DEFAULT_VPN_MTU))
         set(value) = prefs.edit().putInt("saved_vpn_mtu", sanitizeVpnMtu(value)).apply()
+
+    internal fun importEnrollment(profile: EnrollmentProfile) {
+        // Changing authority also invalidates credentials and pending PKCE state
+        // when the issuer differs. All non-secret fields share one editor transaction.
+        keycloak.updateAuthority(profile.keycloak.url, profile.keycloak.realm, profile.keycloak.clientId)
+        prefs
+            .edit()
+            .putString("saved_ip", profile.endpoint.host)
+            .putString("saved_port", profile.endpoint.port.toString())
+            .putString("saved_pin", profile.certPin)
+            .putString("saved_ech_config", profile.echConfig.orEmpty())
+            .putBoolean("saved_use_keycloak", true)
+            .putBoolean("saved_censorship_resistant", profile.transport.censorshipResistant)
+            .putBoolean("saved_http3_framing", profile.transport.http3Framing)
+            .putBoolean("saved_http2_framing", profile.transport.http2Framing)
+            .putInt("saved_vpn_mtu", profile.vpnMtu)
+            .apply()
+    }
 
     var tempSplitMode: String
         get() = prefs.getString("temp_split_mode", "exclude") ?: "exclude"

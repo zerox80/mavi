@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Import Mavi VPN profile</title>
+  <link rel="stylesheet" href="/styles.css">
+  <script src="/enroll.js" defer></script>
+</head>
+<body>
+  <header class="site-header"><span class="brand">Mavi <span>VPN enrollment</span></span></header>
+  <main class="page-shell narrow">
+    <section class="card enrollment-page">
+      <p class="eyebrow">Single-use profile</p>
+      <h1>Connect this device</h1>
+      <p>Open the link in Mavi to let the app import the profile. Alternatively, explicitly redeem it here or download the JSON file.</p>
+      <div class="notice">This ticket expires 15 minutes after creation and works only once. Viewing this page does not redeem it.</div>
+      <p id="enrollment-message" class="message" role="status" aria-live="polite" hidden></p>
+      <div class="enrollment-actions">
+        <a id="open-in-mavi" class="button primary" href="#">Open in Mavi</a>
+        <button id="copy-enrollment" class="button secondary" type="button">Copy enrollment link</button>
+      </div>
+      <div class="enrollment-actions">
+        <button id="redeem-button" class="button secondary" type="button">Redeem once and show JSON</button>
+        <button id="download-button" class="button secondary" type="button">Redeem once and download JSON</button>
+      </div>
+      <label for="manual-link">Enrollment link</label>
+      <input id="manual-link" class="breakable" type="text" readonly>
+      <pre id="profile-output" tabindex="0" hidden></pre>
+      <p class="hint">The profile contains the VPN endpoint, public certificate PIN, transport, and Keycloak coordinates. It contains no access token or refresh token. Mavi will ask you to sign in separately.</p>
+      <a class="text-link" href="/">Go to the device panel</a>
+    </section>
+  </main>
+</body>
+</html>
