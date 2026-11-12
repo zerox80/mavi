@@ -293,7 +293,7 @@ mavi-vpn/
 ├── windows/            # Windows client (Rust) — WinTUN, Service/Client IPC
 │   └── src/
 │       ├── main.rs           # CLI client (start/stop/status)
-│       ├── bin/service.rs    # Windows Service (WinTUN, routing, NRPT DNS)
+│       ├── bin/service/      # Windows Service (WinTUN, routing, NRPT DNS)
 │       ├── vpn_core/         # QUIC/HTTP2 tunnel logic, ECH, MASQUE framing
 │       └── oauth.rs          # PKCE OAuth2 flow for Keycloak
 │
@@ -326,7 +326,7 @@ mavi-vpn/
 │
 ├── quic-tester/        # Checks the response to unauthenticated HTTP/3 probes
 ├── docs/               # INSTALLATION.md, NGINX_PROXY.md, whitepaper.tex
-├── Dockerfile          # Multi-stage build (rust:1.97-slim → debian:trixie-slim)
+├── Dockerfile          # Multi-stage build (rust:1.98-slim → debian:trixie-slim)
 └── .github/workflows/  # CI: build (Linux CLI, Android APK, Linux/Windows GUI), tests
 ```
 
