@@ -17,7 +17,9 @@ fn advertised_config_options_dispatch_direct_connections_with_the_selected_file(
             );
         }
     }
-    for command in ["start", "stop", "daemon", "status", "repair", "--help"] {
+    for command in [
+        "start", "stop", "daemon", "status", "repair", "enroll", "--help",
+    ] {
         assert_eq!(super::command_name(&[command.into()]), command);
     }
 }

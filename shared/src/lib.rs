@@ -8,6 +8,7 @@ pub mod cert_pin;
 #[cfg(any(feature = "control-client", test))]
 pub mod control;
 pub mod endpoint;
+pub mod enrollment;
 pub mod hex;
 pub mod http2;
 pub mod icmp;

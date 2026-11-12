@@ -59,10 +59,25 @@ use the source build instructions below.
 | | Split Tunneling | Per-app VPN bypass on Android |
 | **Auth** | Static Token | Simple pre-shared key authentication |
 | | Keycloak OIDC | Enterprise SSO with JWT validation, PKCE, and JWKS rotation |
+| | Web Panel | Optional Keycloak-enabled device enrollment with QR codes and one-time links |
 | **Network** | Dual-Stack | Full IPv4 + IPv6 support (NAT66 via ip6tables) |
 | | DNS Isolation | NRPT rules on Windows; per-tunnel DNS on Linux/Android |
 
 ## Quick Start
+
+### Guided Linux Server Setup (Recommended)
+
+Run the Python-based guided installer from a repository checkout on the Linux server:
+
+```bash
+git clone https://github.com/zerox80/mavi-vpn.git
+cd mavi-vpn
+./install-server.sh
+```
+
+The recommended setup enables the web panel and Keycloak together. After confirmation, the installer sets up missing Docker packages, generates secrets, configures Nginx for `panel.<domain>` and `auth.<domain>`, obtains and renews Let's Encrypt certificates, and starts the services. The classic setup keeps the existing static-token and certificate-PIN workflow; Keycloak without the panel remains available in advanced mode. Existing installations retain their selected mode and stored secrets.
+
+The inner TUN MTU remains `1280` and the derived QUIC transport MTU remains `1360`; no MTU test or additional prompt is required. See [docs/INSTALLATION.md](docs/INSTALLATION.md) for firewall requirements and manual deployment options.
 
 ### Server Deployment (Prebuilt Docker Images)
 

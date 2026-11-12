@@ -1,0 +1,39 @@
+[package]
+name = "mavi-panel"
+version.workspace = true
+edition = "2021"
+rust-version.workspace = true
+description = "Mavi VPN web management panel"
+license = "MIT"
+repository = "https://github.com/zerox80/mavi-vpn"
+
+[lints]
+workspace = true
+
+[dependencies]
+axum = { version = "0.8", features = ["macros"] }
+base64 = "0.23"
+chrono = { version = "0.4", features = ["serde"] }
+constant_time_eq = "0.6"
+cookie = "0.18"
+getrandom = "0.4"
+http = { workspace = true }
+jsonwebtoken = { version = "11.0", default-features = false, features = ["aws_lc_rs"] }
+qrcode = "0.14"
+reqwest = { version = "0.13", features = ["json", "form", "rustls-no-provider"], default-features = false }
+rustls = { workspace = true }
+serde = { workspace = true }
+serde_json = "1.0"
+shared = { workspace = true }
+sha2 = "0.11"
+sqlx = { version = "0.8", default-features = false, features = ["chrono", "postgres", "runtime-tokio-rustls", "uuid"] }
+thiserror = { workspace = true }
+tokio = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+url = { version = "2", features = ["serde"] }
+uuid = { version = "1", features = ["serde", "v4"] }
+
+[dev-dependencies]
+rcgen = { workspace = true }
+tower = { version = "0.5", features = ["util"] }

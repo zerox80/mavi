@@ -2,12 +2,20 @@ package com.mavi.vpn.viewmodel
 
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
-import com.mavi.vpn.VpnConnectionState
+import androidx.lifecycle.viewModelScope
+import com.mavi.vpn.EnrollmentClient
+import com.mavi.vpn.EnrollmentProfile
+import com.mavi.vpn.EnrollmentRedeemResult
+import com.mavi.vpn.EnrollmentRequest
+import com.mavi.vpn.EnrollmentUiState
 import com.mavi.vpn.MaviVpnService
+import com.mavi.vpn.VpnConnectionState
 import com.mavi.vpn.data.PrefsManager
+import com.mavi.vpn.enrollmentImportAllowed
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
 
 class VpnViewModel(
     application: Application,
@@ -70,6 +78,10 @@ class VpnViewModel(
     private val _errorMessage = MutableStateFlow("")
     val errorMessage: StateFlow<String> = _errorMessage.asStateFlow()
 
+    private val mutableEnrollmentState = MutableStateFlow<EnrollmentUiState>(EnrollmentUiState.Idle)
+    internal val enrollmentState: StateFlow<EnrollmentUiState> = mutableEnrollmentState.asStateFlow()
+    private val handledEnrollmentRequests = mutableSetOf<String>()
+
     val connectionState = MaviVpnService.connectionState
     val pausedUntil = MaviVpnService.pausedUntil
 
@@ -89,6 +101,82 @@ class VpnViewModel(
 
     fun updateErrorMessage(message: String) {
         _errorMessage.value = message
+    }
+
+    internal fun startEnrollment(request: EnrollmentRequest) {
+        if (mutableEnrollmentState.value != EnrollmentUiState.Idle || !handledEnrollmentRequests.add(request.fingerprint)) {
+            return
+        }
+        if (!enrollmentImportAllowed(connectionState.value)) {
+            mutableEnrollmentState.value =
+                EnrollmentUiState.Error(
+                    "Disconnect the VPN before importing an enrollment profile. The ticket has not been redeemed.",
+                )
+            return
+        }
+        mutableEnrollmentState.value = EnrollmentUiState.Redeeming
+        viewModelScope.launch {
+            mutableEnrollmentState.value =
+                when (val result = EnrollmentClient.redeem(request)) {
+                    is EnrollmentRedeemResult.Success -> EnrollmentUiState.Confirmation(result.profile)
+                    is EnrollmentRedeemResult.Failure -> EnrollmentUiState.Error(result.message)
+                }
+        }
+    }
+
+    internal fun showEnrollmentError(message: String) {
+        if (mutableEnrollmentState.value == EnrollmentUiState.Idle) {
+            mutableEnrollmentState.value = EnrollmentUiState.Error(message)
+        }
+    }
+
+    internal fun cancelEnrollment() {
+        if (mutableEnrollmentState.value is EnrollmentUiState.Confirmation) {
+            mutableEnrollmentState.value =
+                EnrollmentUiState.Error(
+                    "The profile was not imported. The ticket has already been redeemed; request a new enrollment link.",
+                )
+        }
+    }
+
+    internal fun confirmEnrollmentImport() {
+        val confirmation = mutableEnrollmentState.value as? EnrollmentUiState.Confirmation ?: return
+        val error = importEnrollment(confirmation.profile)
+        mutableEnrollmentState.value =
+            if (error == null) {
+                EnrollmentUiState.Imported
+            } else {
+                EnrollmentUiState.Error("$error The ticket has already been redeemed; request a new link afterward.")
+            }
+    }
+
+    internal fun dismissEnrollment() {
+        if (mutableEnrollmentState.value is EnrollmentUiState.Error || mutableEnrollmentState.value == EnrollmentUiState.Imported) {
+            mutableEnrollmentState.value = EnrollmentUiState.Idle
+        }
+    }
+
+    internal fun importEnrollment(profile: EnrollmentProfile): String? {
+        if (!enrollmentImportAllowed(connectionState.value)) {
+            return "Disconnect the VPN before importing an enrollment profile."
+        }
+
+        prefs.importEnrollment(profile)
+        serverIp.value = profile.endpoint.host
+        serverPort.value = profile.endpoint.port.toString()
+        certPin.value = profile.certPin
+        echConfig.value = profile.echConfig.orEmpty()
+        useKeycloak.value = true
+        kcUrl.value = profile.keycloak.url
+        kcRealm.value = profile.keycloak.realm
+        kcClientId.value = profile.keycloak.clientId
+        censorshipResistant.value = profile.transport.censorshipResistant
+        http3Framing.value = profile.transport.http3Framing
+        http2Framing.value = profile.transport.http2Framing
+        vpnMtu.value = profile.vpnMtu
+        reloadOAuthTokens()
+        _errorMessage.value = ""
+        return null
     }
 
     fun clearAuthToken() {

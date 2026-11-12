@@ -324,4 +324,11 @@ async fn unknown_cli_command_fails() {
         .await
         .unwrap_err();
     assert!(error.to_string().contains("Unknown command"));
+    assert!(error.to_string().contains("enroll <enrollment-link>"));
+}
+
+#[tokio::test]
+async fn enrollment_requires_a_link_before_any_network_or_file_changes() {
+    let error = crate::dispatch_cli(&["enroll".into()]).await.unwrap_err();
+    assert!(error.to_string().contains("Usage: mavi-vpn-client enroll"));
 }

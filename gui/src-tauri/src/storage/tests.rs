@@ -1,6 +1,7 @@
 use super::*;
 use crate::secret_store::tests::MemorySecretStore;
 
+mod enrollment;
 mod persistence;
 
 fn test_config() -> Config {
