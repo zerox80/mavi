@@ -28,7 +28,7 @@ all = "warn"
 [workspace.dependencies]
 shared = { path = "shared" }
 tokio = { version = "1.53.3", features = ["full"] }
-quinn = { version = "=0.12.0", default-features = false, features = ["rustls", "runtime-tokio", "ring"] }
+quinn = { git = "https://github.com/zerox80/quinn", branch = "main", default-features = false, features = ["rustls", "runtime-tokio", "ring"] }
 rustls = { version = "0.23.45", default-features = false, features = ["aws-lc-rs", "std"] }
 anyhow = "1.0"
 bytes = "1.0"
@@ -42,8 +42,8 @@ ipnetwork = "0.21"
 etherparse = "0.21"
 dashmap = "6.1"
 thiserror = "2.0"
-h3 = "0.0.8"
-h3-quinn = { version = "0.0.10", features = ["datagram"] }
+h3 = { git = "https://github.com/zerox80/h3", branch = "master" }
+h3-quinn = { git = "https://github.com/zerox80/h3", branch = "master", features = ["datagram"] }
 tempfile = "3"
 proptest = "1"
 dotenvy = "0.15"
@@ -62,11 +62,10 @@ h2 = { git = "https://github.com/zerox80/h2", branch = "master" }
 quinn = { git = "https://github.com/zerox80/quinn", branch = "main" }
 quinn-proto = { git = "https://github.com/zerox80/quinn", branch = "main" }
 quinn-udp = { git = "https://github.com/zerox80/quinn", branch = "main" }
-# Use our h3 fork so h3-quinn resolves to Quinn 0.12. This prevents a second
-# crates.io Quinn 0.11 dependency from being pulled in alongside the fork.
-h3 = { git = "https://github.com/zerox80/h3", branch = "main" }
-h3-quinn = { git = "https://github.com/zerox80/h3", branch = "main" }
-h3-datagram = { git = "https://github.com/zerox80/h3", branch = "main" }
+# Keep transitive H3 dependencies on the same fork as direct clients.
+h3 = { git = "https://github.com/zerox80/h3", branch = "master" }
+h3-quinn = { git = "https://github.com/zerox80/h3", branch = "master" }
+h3-datagram = { git = "https://github.com/zerox80/h3", branch = "master" }
 
 [profile.release]
 lto = true

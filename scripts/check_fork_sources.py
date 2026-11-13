@@ -24,9 +24,9 @@ class Fork:
 
 EXPECTED = {
     "h2": Fork("https://github.com/zerox80/h2", "master"),
-    "h3": Fork("https://github.com/zerox80/h3", "main"),
-    "h3-datagram": Fork("https://github.com/zerox80/h3", "main"),
-    "h3-quinn": Fork("https://github.com/zerox80/h3", "main"),
+    "h3": Fork("https://github.com/zerox80/h3", "master"),
+    "h3-datagram": Fork("https://github.com/zerox80/h3", "master"),
+    "h3-quinn": Fork("https://github.com/zerox80/h3", "master"),
     "quinn": Fork("https://github.com/zerox80/quinn", "main"),
     "quinn-proto": Fork("https://github.com/zerox80/quinn", "main"),
     "quinn-udp": Fork("https://github.com/zerox80/quinn", "main"),
@@ -38,7 +38,8 @@ def load_toml(path: Path) -> dict:
 
 
 def validate_manifest(errors: list[str]) -> None:
-    patches = load_toml(CARGO_TOML).get("patch", {}).get("crates-io", {})
+    manifest = load_toml(CARGO_TOML)
+    patches = manifest.get("patch", {}).get("crates-io", {})
     for package, expected in EXPECTED.items():
         dependency = patches.get(package)
         if not isinstance(dependency, dict):
@@ -51,6 +52,18 @@ def validate_manifest(errors: list[str]) -> None:
         for forbidden in ("rev", "tag"):
             if forbidden in dependency:
                 errors.append(f"Cargo.toml patch for {package} must never set {forbidden}")
+    direct = manifest.get("workspace", {}).get("dependencies", {})
+    for package in ("quinn", "h3", "h3-quinn"):
+        dependency = direct.get(package)
+        expected = EXPECTED[package]
+        if not isinstance(dependency, dict):
+            errors.append(f"Workspace {package} must use a Git branch without a version constraint")
+            continue
+        if dependency.get("git") != expected.repository or dependency.get("branch") != expected.branch:
+            errors.append(f"Workspace {package} must track {expected.repository} {expected.branch}")
+        for forbidden in ("version", "rev", "tag"):
+            if forbidden in dependency:
+                errors.append(f"Workspace {package} must never set {forbidden}")
 
 
 def validate_lock(errors: list[str]) -> dict[Fork, str]:

@@ -40,7 +40,7 @@ Use concise imperative subjects, e.g. `Fix automatic reconnect after generic ser
 
 ## Required Fork Policy
 
-Always use the latest commits of the `zerox80` forks: h2 `master`, h3/Quinn `main`. Preserve branch patches; never substitute registry releases or fixed revision/tag pins. Refresh and verify:
+Always use the latest commits of the `zerox80` forks: h2/h3 `master`, Quinn `main`. Preserve branch patches; never substitute registry releases or fixed revision/tag pins. Direct Quinn/H3 dependencies must use Git branches without package-version constraints. Refresh and verify:
 
 ```sh
 cargo update -p h2 -p quinn -p quinn-proto -p quinn-udp -p h3 -p h3-quinn -p h3-datagram

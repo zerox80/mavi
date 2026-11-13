@@ -1300,7 +1300,7 @@ dependencies = [
  "libc",
  "option-ext",
  "redox_users",
- "windows-sys 0.61.2",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
@@ -1496,7 +1496,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "39cab71617ae0d63f51a36d69f866391735b51691dbda63cf6f96d042b63efeb"
 dependencies = [
  "libc",
- "windows-sys 0.61.2",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
@@ -2069,7 +2069,7 @@ dependencies = [
 [[package]]
 name = "h3"
 version = "0.0.8"
-source = "git+https://github.com/zerox80/h3?branch=main#99533cd3f198cd9b548d5264cd7bff07e7d08cc0"
+source = "git+https://github.com/zerox80/h3?branch=master#af509e3e645e86fc90319b04c55677a72960eb76"
 dependencies = [
  "bytes",
  "fastrand",
@@ -2082,7 +2082,7 @@ dependencies = [
 [[package]]
 name = "h3-datagram"
 version = "0.0.2"
-source = "git+https://github.com/zerox80/h3?branch=main#99533cd3f198cd9b548d5264cd7bff07e7d08cc0"
+source = "git+https://github.com/zerox80/h3?branch=master#af509e3e645e86fc90319b04c55677a72960eb76"
 dependencies = [
  "bytes",
  "h3",
@@ -2091,7 +2091,7 @@ dependencies = [
 [[package]]
 name = "h3-quinn"
 version = "0.0.10"
-source = "git+https://github.com/zerox80/h3?branch=main#99533cd3f198cd9b548d5264cd7bff07e7d08cc0"
+source = "git+https://github.com/zerox80/h3?branch=master#af509e3e645e86fc90319b04c55677a72960eb76"
 dependencies = [
  "bytes",
  "futures-util",
@@ -3216,7 +3216,7 @@ version = "0.50.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7957b9740744892f114936ab4a57b3f487491bbeafaf8083688b16841a4240e5"
 dependencies = [
- "windows-sys 0.61.2",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
@@ -3938,7 +3938,7 @@ dependencies = [
 [[package]]
 name = "quinn"
 version = "0.12.0"
-source = "git+https://github.com/zerox80/quinn?branch=main#c5b1c4a6ff452402817f2b35e7c576167703d5e0"
+source = "git+https://github.com/zerox80/quinn?branch=main#c752d53293fcc000de5e09c634e1b25e20d54f5b"
 dependencies = [
  "bytes",
  "cfg_aliases",
@@ -3958,7 +3958,7 @@ dependencies = [
 [[package]]
 name = "quinn-proto"
 version = "0.12.0"
-source = "git+https://github.com/zerox80/quinn?branch=main#c5b1c4a6ff452402817f2b35e7c576167703d5e0"
+source = "git+https://github.com/zerox80/quinn?branch=main#c752d53293fcc000de5e09c634e1b25e20d54f5b"
 dependencies = [
  "bytes",
  "getrandom 0.4.3",
@@ -3979,13 +3979,13 @@ dependencies = [
 [[package]]
 name = "quinn-udp"
 version = "0.6.3"
-source = "git+https://github.com/zerox80/quinn?branch=main#c5b1c4a6ff452402817f2b35e7c576167703d5e0"
+source = "git+https://github.com/zerox80/quinn?branch=main#c752d53293fcc000de5e09c634e1b25e20d54f5b"
 dependencies = [
  "cfg_aliases",
  "libc",
  "socket2",
  "tracing",
- "windows-sys 0.61.2",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
@@ -4269,7 +4269,7 @@ dependencies = [
  "errno",
  "libc",
  "linux-raw-sys",
- "windows-sys 0.61.2",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
@@ -4328,7 +4328,7 @@ dependencies = [
  "security-framework",
  "security-framework-sys",
  "webpki-root-certs",
- "windows-sys 0.61.2",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
@@ -5417,7 +5417,7 @@ dependencies = [
  "getrandom 0.4.3",
  "once_cell",
  "rustix",
- "windows-sys 0.61.2",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
@@ -6338,7 +6338,7 @@ version = "0.1.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c2a7b1c03c876122aa43f3020e6c3c3ee5c05081c9a00739faf7503aeba10d22"
 dependencies = [
- "windows-sys 0.61.2",
+ "windows-sys 0.48.0",
 ]
 
 [[package]]

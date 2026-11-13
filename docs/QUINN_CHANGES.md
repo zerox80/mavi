@@ -1,6 +1,6 @@
 # Quinn Changes
 
-This project resolves Quinn through the `zerox80/quinn` fork and `h3` through the `zerox80/h3` fork. The root `Cargo.toml` pins those patches to immutable commit revisions so `h3-quinn` uses Quinn 0.12 instead of pulling a second Quinn 0.11 dependency from crates.io.
+This project tracks Quinn from `zerox80/quinn` branch `main` and H3 from `zerox80/h3` branch `master`. Direct Quinn and H3 dependencies have no package-version, revision or tag constraints. `Cargo.lock` records the commits used by a tested build; the Update forks workflow refreshes that lockfile and verifies the current branch heads before keeping the new result.
 
 ## 2026-04-27
 
@@ -15,7 +15,7 @@ This project resolves Quinn through the `zerox80/quinn` fork and `h3` through th
 - `quinn-proto/src/connection/datagrams.rs`: report when oversized queued DATAGRAMs are dropped after an MTU reduction.
 - `quinn-proto/src/connection/mod.rs`: emit `DatagramsUnblocked` when dropping oversized queued DATAGRAMs frees send-buffer space.
 
-## Fork State
+## Historical fork state (2026-04-27)
 
 - `quinn`, `quinn-proto`, and `quinn-udp` are patched to `https://github.com/zerox80/quinn`, revision `760ba55d0192cc2b3da86f184d7a9f3874738515`.
 - `h3`, `h3-quinn`, and `h3-datagram` are patched to `https://github.com/zerox80/h3`, revision `99533cd3f198cd9b548d5264cd7bff07e7d08cc0`.
