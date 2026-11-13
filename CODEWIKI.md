@@ -189,7 +189,7 @@ For enterprise setups where an existing Nginx server handles wildcard certificat
 - **Traefik**: Set `TRAEFIK_HTTPS_PORT=11443` and `TRAEFIK_ACME_RESOLVER=""`.
 - **Nginx Proxy**: Use `proxy_pass http://127.0.0.1:11443` to bridge the traffic.
 
-For a full Nginx configuration snippet, see [NGINX_PROXY.md](file:///c:/Daten1/mavi-vpn/docs/NGINX_PROXY.md).
+For a full Nginx configuration snippet, see [NGINX_PROXY.md](docs/NGINX_PROXY.md).
 
 ---
 **CodeWiki Generation Date**: 2026-03-21 
