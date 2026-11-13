@@ -31,8 +31,8 @@ Useful contributions right now:
 You need Rust installed.
 
 ```bash
-git clone https://github.com/zerox80/mavi-vpn.git
-cd mavi-vpn
+git clone https://github.com/zerox80/mavi.git
+cd mavi
 cargo test -p shared
 cargo test -p mavi-vpn
 ```
@@ -56,7 +56,7 @@ For the server Docker setup:
 cd backend
 cp .env.example .env
 # edit .env and set a real VPN_AUTH_TOKEN
-docker-compose up -d --build
+docker compose up -d --build
 ```
 
 The Android app needs Android Studio, the Android NDK, and `cargo-ndk`.
