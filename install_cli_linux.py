@@ -116,7 +116,7 @@ def render_service_unit(template, dest):
 def main():
     if not sys.platform.startswith("linux"):
         err("This script is for Linux only.")
-        err("For Windows use: python install_cli_windows.py")
+        err("For Windows, see README.md and windows/README.md for installation instructions.")
         sys.exit(1)
 
     print()
