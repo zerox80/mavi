@@ -1,4 +1,4 @@
-name: Publish VPN server image
+name: Publish VPN server and panel images
 
 on:
   push:
@@ -13,6 +13,8 @@ on:
       - backend/Cargo.toml
       - backend/entrypoint.sh
       - shared/**
+      - panel/**
+      - .dockerignore
       - '**/Cargo.toml'
       - scripts/check_fork_sources.py
       - .github/workflows/publish-server.yml
@@ -68,6 +70,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
+        component: [vpn, panel]
+        arch: [amd64, arm64]
         include:
           - arch: amd64
             runner: ubuntu-24.04
@@ -101,15 +105,15 @@ jobs:
         uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7
         with:
           context: .
-          file: docker/server/Dockerfile
+          file: ${{ matrix.component == 'panel' && 'panel/Dockerfile' || 'docker/server/Dockerfile' }}
           platforms: linux/${{ matrix.arch }}
           pull: true
           outputs: type=image,name=${{ env.IMAGE }},push-by-digest=true,name-canonical=true,push=true
-          cache-from: type=gha,scope=vpn-${{ matrix.arch }}
-          cache-to: type=gha,scope=vpn-${{ matrix.arch }},mode=max
+          cache-from: type=gha,scope=${{ matrix.component }}-${{ matrix.arch }}
+          cache-to: type=gha,scope=${{ matrix.component }}-${{ matrix.arch }},mode=max
           labels: |
-            org.opencontainers.image.title=Mavi VPN Server
-            org.opencontainers.image.description=Prebuilt Mavi VPN server for Docker Compose
+            org.opencontainers.image.title=Mavi ${{ matrix.component }}
+            org.opencontainers.image.description=Prebuilt Mavi ${{ matrix.component }} for Docker Compose
             org.opencontainers.image.source=https://github.com/zerox80/mavi
             org.opencontainers.image.url=https://github.com/zerox80/mavi
             org.opencontainers.image.revision=${{ needs.prepare.outputs.source_sha }}
@@ -124,13 +128,16 @@ jobs:
       - name: Save image digest
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: digest-${{ matrix.arch }}
+          name: digest-${{ matrix.component }}-${{ matrix.arch }}
           path: ${{ runner.temp }}/digests/*
           if-no-files-found: error
           retention-days: 1
 
   publish:
     needs: [prepare, build]
+    strategy:
+      matrix:
+        component: [vpn, panel]
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     permissions:
@@ -141,7 +148,7 @@ jobs:
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           path: ${{ runner.temp }}/digests
-          pattern: digest-*
+          pattern: digest-${{ matrix.component }}-*
           merge-multiple: true
       - name: Set up Buildx
         uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4
@@ -151,10 +158,11 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-      - name: Publish combined image only after both builds succeed
+      - name: Publish combined image only after every component and architecture succeeds
         working-directory: ${{ runner.temp }}/digests
         env:
-          BUILD_TAG: build-${{ github.run_id }}-${{ github.run_attempt }}
+          BUILD_TAG: ${{ matrix.component == 'panel' && 'panel-' || '' }}build-${{ github.run_id }}-${{ github.run_attempt }}
+          LATEST_TAG: ${{ matrix.component == 'panel' && 'panel-latest' || 'latest' }}
           SOURCE_SHA: ${{ needs.prepare.outputs.source_sha }}
         run: |
           images=()
@@ -163,7 +171,7 @@ jobs:
           done
           docker buildx imagetools create \
             --tag "$IMAGE:$BUILD_TAG" \
-            --tag "$IMAGE:latest" \
+            --tag "$IMAGE:$LATEST_TAG" \
             "${images[@]}"
           {
             docker buildx imagetools inspect "$IMAGE:$BUILD_TAG"

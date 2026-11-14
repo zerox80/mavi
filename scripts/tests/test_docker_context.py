@@ -1,5 +1,6 @@
 """Exercise Docker/Podman's real context filtering with harmless sentinel files."""
 import os
+import re
 from pathlib import Path
 import shutil
 import subprocess
@@ -34,7 +35,11 @@ class DockerContextTests(unittest.TestCase):
                     shutil.copyfile(ignore, source / ".dockerignore")
                     excluded = [".env", ".env.production", "auth_token.txt", "mavi-vpn.json", ".git/config", "data/private.pem", "letsencrypt/account.key", "backend/data/tls.key", "backend/letsencrypt/privkey.pem", "target/debug/cache", "node_modules/cache", "src/secret.key", "backend/src/secret.key"]
                     excluded += ["docker/server/data/private.pem", "docker/server/.env", "Android-docker-build/output/apk/debug/app-debug.apk"]
-                    included = ["Cargo.toml", "backend/Cargo.toml", "shared/src/lib.rs", "backend/src/main.rs", "backend/entrypoint.sh"] if context != "backend" else ["Cargo.toml", "src/main.rs", "entrypoint.sh"]
+                    included = ["Cargo.toml", "shared/src/lib.rs", "backend/src/main.rs", "backend/entrypoint.sh"] if context != "backend" else ["Cargo.toml", "src/main.rs", "entrypoint.sh"]
+                    if context != "backend":
+                        members = re.search(r'members\s*=\s*\[(.*?)\]', (ROOT / "Cargo.toml").read_text(), re.S)
+                        included += [f"{member}/Cargo.toml" for member in re.findall(r'"([^"]+)"', members.group(1))]
+                        included += ["panel/src/main.rs", "panel/web/index.html"]
                     if context == "server":
                         included.append("LICENSE")
                     for name in excluded + included:

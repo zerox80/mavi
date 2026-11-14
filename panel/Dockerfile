@@ -7,7 +7,8 @@ WORKDIR /app
 
 # Install git for Cargo to fetch git dependencies
 # hadolint ignore=DL3008
-RUN apt-get update && apt-get install -y --no-install-recommends git && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    git cmake pkg-config build-essential && rm -rf /var/lib/apt/lists/*
 
 # Keep the checked-in workspace manifest and lockfile together. Rewriting the
 # workspace member list would require Cargo to rewrite Cargo.lock and is
@@ -31,6 +32,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 COPY --from=builder /mavi-panel /usr/local/bin/mavi-panel
+COPY --from=builder /app/Cargo.lock /usr/share/mavi-panel/Cargo.lock
+COPY --from=builder /app/LICENSE /usr/share/mavi-panel/LICENSE
 
 EXPOSE 8081
 USER 1000:1000
