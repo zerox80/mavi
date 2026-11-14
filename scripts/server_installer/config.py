@@ -157,7 +157,8 @@ def plan_from_existing(values: Mapping[str, str]) -> InstallPlan:
         acme_email=values.get("ACME_EMAIL", ""),
         proxy=proxy_from_environment(values),
         existing=True,
-        build_from_source=parse_bool(values.get("MAVI_BUILD_FROM_SOURCE")),
+        build_from_source=(parse_bool(values["MAVI_BUILD_FROM_SOURCE"]) if "MAVI_BUILD_FROM_SOURCE" in values
+                           else "docker-compose.build.yml" in values.get("COMPOSE_FILE", "").split(":")),
     )
 
 

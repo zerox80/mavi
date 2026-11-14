@@ -1,6 +1,7 @@
 # Optional source build; the guided installer normally pulls a prebuilt image.
 services:
   vpn-server:
+    image: mavi-vpn:source
     build:
       context: ..
       dockerfile: docker/server/Dockerfile

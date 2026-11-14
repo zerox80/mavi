@@ -70,6 +70,12 @@ class PrebuiltImagesTests(unittest.TestCase):
         self.assertIn(":docker-compose.build.yml", values["COMPOSE_FILE"])
         self.assertNotIn("panel/", values["COMPOSE_FILE"])
 
+    def test_existing_source_override_is_recognized_without_a_saved_installer_flag(self):
+        values = {"COMPOSE_FILE": "docker-compose.yml:docker-compose.build.yml"}
+        self.assertTrue(plan_from_existing(values).build_from_source)
+        values["MAVI_BUILD_FROM_SOURCE"] = "false"
+        self.assertFalse(plan_from_existing(values).build_from_source)
+
     def test_default_start_uses_no_build_and_explicit_files(self):
         plan, values = self.values(CLASSIC)
         with mock.patch.object(installer, "run") as run:
@@ -130,6 +136,8 @@ class PrebuiltImagesTests(unittest.TestCase):
                     for name in images.stack_services(plan, values):
                         self.assertTrue(services[name].get("image"), name)
                     self.assertEqual(bool(services["vpn-server"].get("build")), source)
+                    if source:
+                        self.assertEqual(services["vpn-server"]["image"], "mavi-vpn:source")
                     if mode == PANEL: self.assertEqual(bool(services["panel"].get("build")), source)
                     else: self.assertNotIn("panel", services)
 

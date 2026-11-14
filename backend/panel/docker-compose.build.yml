@@ -1,6 +1,7 @@
 # Added only when the panel is enabled and --build-from-source was requested.
 services:
   panel:
+    image: mavi-panel:source
     build:
       context: ..
       dockerfile: panel/Dockerfile
