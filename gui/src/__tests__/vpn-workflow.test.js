@@ -24,7 +24,7 @@ vi.mock('../toast.js', () => ({
 }));
 
 vi.mock('../connections.js', () => ({
-  renderConnectionList: vi.fn(),
+  updateConnectionListState: vi.fn(),
 }));
 
 function setupVpnDom() {
@@ -33,14 +33,8 @@ function setupVpnDom() {
     <div id="ip-readout"></div>
     <div id="hero-title"></div>
     <div id="hero-subtitle"></div>
-    <div id="hero-node-id"></div>
-    <div id="hero-lat"></div>
-    <div id="title-state-label"></div>
     <div id="hero-status"></div>
-    <div id="core-label"></div>
-    <div id="net-node"></div>
     <div id="net-endpoint"></div>
-    <div id="net-ip"></div>
     <div id="net-service"></div>
     <div id="net-protocol"></div>
     <div id="net-transport"></div>
@@ -221,16 +215,20 @@ describe('vpn workflows', () => {
 
   it('setHero renders each hero state label', () => {
     setHero('connecting');
-    expect(document.getElementById('connect-btn').textContent).toBe('CANCEL');
-    expect(document.getElementById('core-label').textContent).toBe('HANDSHAKE');
+    expect(document.getElementById('connect-btn').textContent).toBe('Cancel');
+    expect(document.getElementById('hero-status').textContent).toBe('Connecting');
 
     setHero('disconnecting');
-    expect(document.getElementById('connect-btn').textContent).toBe('DISCONNECTING...');
-    expect(document.getElementById('core-label').textContent).toBe('CLEANUP');
+    expect(document.getElementById('connect-btn').textContent).toBe('Disconnecting…');
+    expect(document.getElementById('hero-status').textContent).toBe('Disconnecting');
 
     setHero('on');
-    expect(document.getElementById('connect-btn').textContent).toBe('DISCONNECT');
-    expect(document.getElementById('title-state-label').textContent).toBe('ENCRYPTED');
+    expect(document.getElementById('connect-btn').textContent).toBe('Disconnect');
+    expect(document.getElementById('hero-status').textContent).toBe('Connected');
+
+    setHero('off');
+    expect(document.getElementById('connect-btn').textContent).toBe('Connect');
+    expect(document.getElementById('hero-status').textContent).toBe('Not connected');
   });
 
   it('selection state disables connect with no active connection', () => {
@@ -241,6 +239,6 @@ describe('vpn workflows', () => {
     applyHeroForSelection();
 
     expect(document.getElementById('connect-btn').disabled).toBe(true);
-    expect(document.getElementById('hero-title').textContent).toBe('No node selected');
+    expect(document.getElementById('hero-title').textContent).toBe('No connection selected');
   });
 });

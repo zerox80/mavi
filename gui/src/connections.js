@@ -1,6 +1,6 @@
 import { state, $ } from './state.js';
 import { savePrefs } from './theme.js';
-import { escapeHtml, initials } from './utils.js';
+import { escapeHtml } from './utils.js';
 import { showToast } from './toast.js';
 
 let _openModal = null;
@@ -27,14 +27,14 @@ export function renderConnectionList() {
 
   if (state.prefs.connections.length === 0) {
     list.innerHTML =
-      '<div class="conn-empty">No saved connections yet.<br/>Tap + ADD CONNECTION below.</div>';
+      '<div class="conn-empty">No saved connections yet.<br/>Add one to get started.</div>';
     return;
   }
 
   list.innerHTML = '';
   const header = document.createElement('div');
   header.className = 'group-header';
-  header.textContent = 'SAVED';
+  header.textContent = 'Connections';
   list.appendChild(header);
 
   if (filtered.length === 0) {
@@ -47,31 +47,55 @@ export function renderConnectionList() {
 
   for (const c of filtered) {
     const row = document.createElement('div');
-    const isSelected = c.id === state.prefs.active_id;
-    const isSession = c.id === state.sessionConnection?.id;
-    const isActive = isSession && state.hero === 'on';
-    const isConnecting = isSession && state.hero === 'connecting';
-    row.className =
-      'conn-row' +
-      (isSelected ? ' selected' : '') +
-      (isActive ? ' active' : '') +
-      (isConnecting ? ' connecting' : '');
+    row.className = 'conn-row';
+    row.dataset.connectionId = c.id;
+    row.tabIndex = 0;
+    row.setAttribute('role', 'button');
     row.addEventListener('click', () => selectConnection(c.id));
     row.addEventListener('dblclick', () => _openModal(c.id));
+    row.addEventListener('keydown', (e) => {
+      if (e.target !== row || (e.key !== 'Enter' && e.key !== ' ')) return;
+      e.preventDefault();
+      selectConnection(c.id);
+    });
     row.innerHTML = `
-      <div class="badge">${escapeHtml(initials(c.label))}</div>
       <div class="main">
         <div class="label">${escapeHtml(c.label)}</div>
         <div class="endpoint">${escapeHtml(c.endpoint)}</div>
       </div>
-      <div class="load"><span></span></div>
+      <span class="state-dot"></span>
+      <button class="icon-btn row-edit" type="button" title="Edit connection" aria-label="Edit connection">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M11.2 2.6l2.2 2.2-7.6 7.6-2.9.7.7-2.9 7.6-7.6z" />
+        </svg>
+      </button>
     `;
+    const edit = row.querySelector('.row-edit');
+    edit.addEventListener('click', (e) => {
+      e.stopPropagation();
+      _openModal(c.id);
+    });
+    edit.addEventListener('dblclick', (e) => e.stopPropagation());
     // Secondary: edit on right-click
     row.addEventListener('contextmenu', (e) => {
       e.preventDefault();
       _openModal(c.id);
     });
     list.appendChild(row);
+  }
+  updateConnectionListState();
+}
+
+export function updateConnectionListState() {
+  const rows = $('connection-list')?.querySelectorAll('.conn-row');
+  if (!rows) return;
+
+  for (const row of rows) {
+    const id = row.dataset.connectionId;
+    const isSession = id === state.sessionConnection?.id;
+    row.classList.toggle('selected', id === state.prefs.active_id);
+    row.classList.toggle('active', isSession && state.hero === 'on');
+    row.classList.toggle('connecting', isSession && state.hero === 'connecting');
   }
 }
 
@@ -84,7 +108,7 @@ export async function selectConnection(id) {
     state.prefs.active_id = previous;
     showToast('Could not save the selected connection. Please try again.', 'error');
   }
-  renderConnectionList();
+  updateConnectionListState();
   if (_applyHero) _applyHero();
 }
 

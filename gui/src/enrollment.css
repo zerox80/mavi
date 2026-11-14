@@ -15,7 +15,7 @@
 #enroll-backdrop {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.35);
+  background: var(--overlay);
   display: none;
   align-items: center;
   justify-content: center;
@@ -27,43 +27,35 @@
 }
 
 #enroll-modal {
-  width: 440px;
-  max-height: 85vh;
+  width: min(460px, calc(100% - 32px));
+  max-height: 88vh;
   background: var(--elevated);
   border: 1px solid var(--line);
-  border-radius: 14px;
-  padding: 22px;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
   display: flex;
   flex-direction: column;
   min-height: 0;
 }
 
 #enroll-modal h3 {
-  font-family: var(--font-display);
-  font-weight: 400;
-  font-size: 24px;
-  letter-spacing: -0.5px;
-  margin-bottom: 4px;
-}
-
-#enroll-modal .sub {
-  font-family: var(--font-mono);
-  font-size: 10px;
-  letter-spacing: 1.5px;
-  color: var(--mute);
-  margin-bottom: 16px;
+  padding: 18px 20px 14px;
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: -0.2px;
+  border-bottom: 1px solid var(--line);
 }
 
 #enroll-modal .form {
   overflow-y: auto;
-  padding-right: 4px;
+  padding: 14px 20px;
 }
 
 #enroll-modal .actions {
-  margin-top: 16px;
+  padding: 14px 20px;
+  border-top: 1px solid var(--line);
   display: flex;
-  gap: 10px;
+  gap: 8px;
   justify-content: flex-end;
 }
 
@@ -118,7 +110,7 @@
   color: var(--warn);
   font-size: 12px;
   line-height: 1.4;
-  margin-top: 12px;
+  margin: 0 20px 14px;
   padding: 9px 11px;
   overflow-wrap: anywhere;
 }

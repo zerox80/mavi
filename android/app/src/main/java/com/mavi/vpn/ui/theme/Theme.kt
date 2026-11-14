@@ -13,100 +13,164 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
+/**
+ * Mavi VPN design tokens. The desktop client mirrors these names and values in
+ * gui/src/style.css; change both when a token changes. Neutrals lean toward the
+ * logo's blue, the accent is the logo blue, and its orange marks transitional states.
+ */
 @Immutable
 data class MaviColors(
     val bg: Color,
     val surface: Color,
     val elevated: Color,
+    val subtle: Color,
     val ink: Color,
     val ink2: Color,
     val mute: Color,
     val line: Color,
+    val lineStrong: Color,
     val accent: Color,
+    val accentSolid: Color,
     val accentSoft: Color,
+    val onAccent: Color,
     val ok: Color,
-    val warn: Color
+    val warn: Color,
+    val danger: Color,
+    val dangerSoft: Color,
 )
 
 val LightColors = MaviColors(
-    bg = Color(0xFFF4F2EC),
-    surface = Color(0xFFFBFAF6),
+    bg = Color(0xFFF3F5F7),
+    surface = Color(0xFFFFFFFF),
     elevated = Color(0xFFFFFFFF),
-    ink = Color(0xFF141310),
-    ink2 = Color(0xFF3A372F),
-    mute = Color(0xFF6B6759),
-    line = Color(0xFFE4DFD2),
-    accent = Color(0xFF2B44FF),
-    accentSoft = Color(0xFFE6E9FF),
-    ok = Color(0xFF146B3A),
-    warn = Color(0xFFC25100)
+    subtle = Color(0xFFE8ECF0),
+    ink = Color(0xFF0E1620),
+    ink2 = Color(0xFF3A4654),
+    mute = Color(0xFF637080),
+    line = Color(0xFFDDE2E8),
+    lineStrong = Color(0xFFC3CBD4),
+    accent = Color(0xFF0B63B5),
+    accentSolid = Color(0xFF0B63B5),
+    accentSoft = Color(0xFFE3EEF9),
+    onAccent = Color(0xFFFFFFFF),
+    ok = Color(0xFF0F7A4D),
+    warn = Color(0xFFB24F0A),
+    danger = Color(0xFFB42318),
+    dangerSoft = Color(0xFFFCEEEC),
 )
 
 val DarkColors = MaviColors(
-    bg = Color(0xFF0B0B0A),
-    surface = Color(0xFF141412),
-    elevated = Color(0xFF1C1C19),
-    ink = Color(0xFFF5F2E8),
-    ink2 = Color(0xFFBFBBAB),
-    mute = Color(0xFF7A7769),
-    line = Color(0xFF26241F),
-    accent = Color(0xFF7A8CFF),
-    accentSoft = Color(0xFF1D2150),
-    ok = Color(0xFF5ECB8A),
-    warn = Color(0xFFF19855)
+    bg = Color(0xFF0B0F14),
+    surface = Color(0xFF10161D),
+    elevated = Color(0xFF17202A),
+    subtle = Color(0xFF18212B),
+    ink = Color(0xFFE8EDF2),
+    ink2 = Color(0xFFB3BDC8),
+    mute = Color(0xFF7D8A98),
+    line = Color(0xFF1F2A35),
+    lineStrong = Color(0xFF2D3A47),
+    accent = Color(0xFF5AA9F0),
+    accentSolid = Color(0xFF1D73C9),
+    accentSoft = Color(0xFF0F2A44),
+    onAccent = Color(0xFFFFFFFF),
+    ok = Color(0xFF4CC58F),
+    warn = Color(0xFFF0974F),
+    danger = Color(0xFFF27B6E),
+    dangerSoft = Color(0xFF2E1714),
 )
 
 val LocalMaviColors = staticCompositionLocalOf { LightColors }
 
+/** Corner radii shared with the desktop client (--radius-md / --radius-lg). */
+object MaviShapes {
+    val control = 6.dp
+    val card = 8.dp
+}
+
+/** Technical values (endpoints, addresses, pins) are set in the monospace face. */
+val MaviMono = FontFamily.Monospace
+
 val MaviTypography = Typography(
-    displayLarge = TextStyle(
-        fontFamily = FontFamily.Serif, // Mapping to Fraunces
-        fontWeight = FontWeight.Normal,
-        fontSize = 36.sp,
-        letterSpacing = (-0.8).sp
+    headlineSmall = TextStyle(
+        fontFamily = FontFamily.SansSerif,
+        fontWeight = FontWeight.SemiBold,
+        fontSize = 24.sp,
+        lineHeight = 30.sp,
+        letterSpacing = (-0.4).sp,
+    ),
+    titleMedium = TextStyle(
+        fontFamily = FontFamily.SansSerif,
+        fontWeight = FontWeight.SemiBold,
+        fontSize = 18.sp,
+        lineHeight = 24.sp,
     ),
     bodyLarge = TextStyle(
-        fontFamily = FontFamily.SansSerif, // Mapping to Geist/UI
+        fontFamily = FontFamily.SansSerif,
         fontWeight = FontWeight.Normal,
-        fontSize = 15.sp
+        fontSize = 15.sp,
+        lineHeight = 22.sp,
+    ),
+    bodyMedium = TextStyle(
+        fontFamily = FontFamily.SansSerif,
+        fontWeight = FontWeight.Normal,
+        fontSize = 14.sp,
+        lineHeight = 20.sp,
+    ),
+    labelLarge = TextStyle(
+        fontFamily = FontFamily.SansSerif,
+        fontWeight = FontWeight.Medium,
+        fontSize = 15.sp,
+    ),
+    labelMedium = TextStyle(
+        fontFamily = FontFamily.SansSerif,
+        fontWeight = FontWeight.Medium,
+        fontSize = 13.sp,
     ),
     labelSmall = TextStyle(
-        fontFamily = FontFamily.Monospace, // Mapping to JetBrains Mono
-        fontWeight = FontWeight.Normal,
-        fontSize = 10.sp,
-        letterSpacing = 1.5.sp
-    )
+        fontFamily = FontFamily.SansSerif,
+        fontWeight = FontWeight.Medium,
+        fontSize = 12.sp,
+    ),
 )
 
 @Composable
 fun MaviVpnTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
-    content: @Composable () -> Unit
+    content: @Composable () -> Unit,
 ) {
     val colors = if (darkTheme) DarkColors else LightColors
 
-    // Also map to Material3 color scheme for standard components
+    // Map the tokens onto Material3 so stock components pick them up too.
     val materialColorScheme = if (darkTheme) {
         darkColorScheme(
             background = colors.bg,
             surface = colors.surface,
-            primary = colors.accent,
-            onPrimary = Color.White,
+            surfaceVariant = colors.subtle,
+            primary = colors.accentSolid,
+            onPrimary = colors.onAccent,
             onBackground = colors.ink,
             onSurface = colors.ink,
-            error = colors.warn
+            onSurfaceVariant = colors.ink2,
+            outline = colors.lineStrong,
+            outlineVariant = colors.line,
+            error = colors.danger,
         )
     } else {
         lightColorScheme(
             background = colors.bg,
             surface = colors.surface,
-            primary = colors.accent,
-            onPrimary = Color.White,
+            surfaceVariant = colors.subtle,
+            primary = colors.accentSolid,
+            onPrimary = colors.onAccent,
             onBackground = colors.ink,
             onSurface = colors.ink,
-            error = colors.warn
+            onSurfaceVariant = colors.ink2,
+            outline = colors.lineStrong,
+            outlineVariant = colors.line,
+            error = colors.danger,
         )
     }
 
@@ -114,7 +178,7 @@ fun MaviVpnTheme(
         MaterialTheme(
             colorScheme = materialColorScheme,
             typography = MaviTypography,
-            content = content
+            content = content,
         )
     }
 }

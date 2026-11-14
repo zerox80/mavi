@@ -1,58 +1,37 @@
+@file:Suppress("ktlint:standard:function-naming", "ktlint:standard:property-naming")
+
 package com.mavi.vpn.ui.screens
 
-import android.content.Context
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Lock
-import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.mavi.vpn.VpnConnectionState
-import com.mavi.vpn.OAuthHelper
 import com.mavi.vpn.formatPauseRemaining
-import com.mavi.vpn.ui.components.MaviCore
-import com.mavi.vpn.ui.components.MaviCoreState
-import com.mavi.vpn.ui.components.MaviTextField
+import com.mavi.vpn.ui.components.DetailRow
+import com.mavi.vpn.ui.components.MaviDivider
+import com.mavi.vpn.ui.components.NavRow
+import com.mavi.vpn.ui.components.PrimaryButton
+import com.mavi.vpn.ui.components.SecondaryButton
+import com.mavi.vpn.ui.components.StatusLine
+import com.mavi.vpn.ui.components.StatusTone
 import com.mavi.vpn.ui.theme.MaviTheme
 import com.mavi.vpn.viewmodel.VpnViewModel
-import kotlinx.coroutines.delay
 
 @Composable
 fun HomeView(
@@ -74,197 +53,146 @@ fun HomeView(
     val useKeycloak by viewModel.useKeycloak.collectAsState()
     val kcUrl by viewModel.kcUrl.collectAsState()
     val pausedUntil by viewModel.pausedUntil.collectAsState()
+    val censorshipResistant by viewModel.censorshipResistant.collectAsState()
+    val http3Framing by viewModel.http3Framing.collectAsState()
+    val http2Framing by viewModel.http2Framing.collectAsState()
 
     val isConnected = connectionState == VpnConnectionState.CONNECTED
     val isConnecting = connectionState == VpnConnectionState.CONNECTING ||
         connectionState == VpnConnectionState.RECONNECTING
     val isPaused = connectionState == VpnConnectionState.PAUSED
     val pauseRemaining = rememberPauseRemainingMillis(if (isPaused) pausedUntil else 0L)
-    val state = when {
-        isConnected -> MaviCoreState.ON
-        isConnecting -> MaviCoreState.CONNECTING
-        else -> MaviCoreState.OFF
-    }
     val statusLabel = when (connectionState) {
-        VpnConnectionState.STOPPED -> "NOT CONNECTED"
-        VpnConnectionState.CONNECTING -> "CONNECTING"
-        VpnConnectionState.CONNECTED -> "ENCRYPTED"
-        VpnConnectionState.RECONNECTING -> "RECONNECTING"
-        VpnConnectionState.PAUSED -> "PAUSED"
+        VpnConnectionState.STOPPED -> "Not connected"
+        VpnConnectionState.CONNECTING -> "Connecting"
+        VpnConnectionState.CONNECTED -> "Connected"
+        VpnConnectionState.RECONNECTING -> "Reconnecting"
+        VpnConnectionState.PAUSED -> "Paused"
     }
-    val labelColor = if (isConnected) T.ok else if (isConnecting) T.accent else if (isPaused) T.warn else T.mute
+    val statusTone = when {
+        isConnected -> StatusTone.OK
+        isConnecting || isPaused -> StatusTone.PROGRESS
+        else -> StatusTone.NEUTRAL
+    }
     val statusDetail = when {
-        isConnected -> "tunnel active"
-        isConnecting -> "connecting…"
-        isPaused && pauseRemaining == 0L -> "waiting to resume"
-        isPaused -> "resume planned in ${formatPauseRemaining(pauseRemaining)}"
-        else -> "ready"
+        isConnected -> "VPN tunnel is active"
+        isConnecting -> "Establishing a secure connection…"
+        isPaused && pauseRemaining == 0L -> "Waiting to resume"
+        isPaused -> "Resumes in ${formatPauseRemaining(pauseRemaining)}"
+        else -> "Ready to connect"
     }
-    val isDark = androidx.compose.foundation.isSystemInDarkTheme()
+    val transport = when {
+        http2Framing -> "HTTP/2 CONNECT-IP"
+        http3Framing || censorshipResistant -> "HTTP/3"
+        else -> "Raw QUIC"
+    }
+
+    val onPrimaryAction: () -> Unit = {
+        if (isPaused) {
+            onResume()
+        } else if (connectionState.canStop) {
+            onDisconnect()
+        } else {
+            viewModel.updateErrorMessage("")
+            if (serverIp.isEmpty()) {
+                viewModel.updateErrorMessage("Please enter a server endpoint in Config.")
+                onGoToConfig()
+            } else if (useKeycloak) {
+                if (kcUrl.isEmpty()) {
+                    viewModel.updateErrorMessage("Please configure Keycloak in Config.")
+                    onGoToConfig()
+                } else {
+                    viewModel.saveKeycloakDetails()
+                    onConnect(serverIp, serverPort, authToken, certPin)
+                }
+            } else {
+                if (presharedKey.isEmpty()) {
+                    viewModel.updateErrorMessage("Please enter a Preshared Key in Config.")
+                    onGoToConfig()
+                } else {
+                    viewModel.saveServerDetails()
+                    onConnect(serverIp, serverPort, presharedKey, certPin)
+                }
+            }
+        }
+    }
 
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(top = 58.dp, bottom = 16.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
+            .verticalScroll(rememberScrollState())
+            .padding(horizontal = 20.dp, vertical = 16.dp),
     ) {
-        // Wordmark
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 24.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.Bottom
-        ) {
-            Text(
-                text = "mavi",
-                fontFamily = MaterialTheme.typography.displayLarge.fontFamily,
-                fontSize = 28.sp,
-                fontWeight = FontWeight.Medium,
-                letterSpacing = (-0.8).sp,
-                color = T.ink
-            )
-            Text(
-                text = "PRIVATE · TUNNEL",
-                fontFamily = MaterialTheme.typography.labelSmall.fontFamily,
-                fontSize = 10.sp,
-                letterSpacing = 1.5.sp,
-                color = T.mute
-            )
-        }
-
-        Spacer(modifier = Modifier.weight(1f))
-
-        // Core Area
-        Box(contentAlignment = Alignment.Center) {
-            MaviCore(state = state, accent = T.accent, isDark = isDark, sizeDp = 240)
-        }
-
-        Spacer(modifier = Modifier.height(16.dp))
-
-        // Status Text
         Text(
-            text = "// $statusLabel",
-            fontFamily = MaterialTheme.typography.labelSmall.fontFamily,
-            fontSize = 10.sp,
-            letterSpacing = 2.sp,
-            color = labelColor
-        )
-        Spacer(modifier = Modifier.height(6.dp))
-        Text(
-            text = if (serverIp.isNotEmpty()) serverIp else "Unknown",
-            fontFamily = MaterialTheme.typography.displayLarge.fontFamily,
-            fontSize = 36.sp,
+            text = "Mavi VPN",
+            style = MaterialTheme.typography.titleMedium,
             color = T.ink,
-            lineHeight = 36.sp,
-            letterSpacing = (-0.8).sp
+            modifier = Modifier.padding(start = 4.dp, top = 4.dp, bottom = 28.dp),
         )
-        Spacer(modifier = Modifier.height(4.dp))
-        Text(
-            text = "Port $serverPort · $statusDetail",
-            fontSize = 13.sp,
-            color = T.ink2
-        )
+
+        Column(modifier = Modifier.padding(horizontal = 4.dp)) {
+            StatusLine(label = statusLabel, tone = statusTone, pulsing = isConnecting)
+            Spacer(modifier = Modifier.height(10.dp))
+            Text(
+                text = serverIp.ifEmpty { "No endpoint configured" },
+                style = MaterialTheme.typography.headlineSmall,
+                color = T.ink,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Spacer(modifier = Modifier.height(6.dp))
+            Text(text = statusDetail, style = MaterialTheme.typography.bodyMedium, color = T.mute)
+        }
 
         Spacer(modifier = Modifier.height(24.dp))
 
-        // Connect Button
-        Button(
-            onClick = {
-                if (isPaused) {
-                    onResume()
-                } else if (connectionState.canStop) {
-                    onDisconnect()
-                } else {
-                    viewModel.updateErrorMessage("")
-                    if (serverIp.isEmpty()) {
-                        viewModel.updateErrorMessage("Please enter a server endpoint in Config.")
-                        onGoToConfig()
-                    } else if (useKeycloak) {
-                        if (kcUrl.isEmpty()) {
-                            viewModel.updateErrorMessage("Please configure Keycloak in Config.")
-                            onGoToConfig()
-                        } else {
-                            viewModel.saveKeycloakDetails()
-                            onConnect(serverIp, serverPort, authToken, certPin)
-                        }
-                    } else {
-                        if (presharedKey.isEmpty()) {
-                            viewModel.updateErrorMessage("Please enter a Preshared Key in Config.")
-                            onGoToConfig()
-                        } else {
-                            viewModel.saveServerDetails()
-                            onConnect(serverIp, serverPort, presharedKey, certPin)
-                        }
-                    }
-                }
-            },
-            colors = ButtonDefaults.buttonColors(
-                containerColor = if (isConnected) Color.Transparent else T.accent,
-                contentColor = if (isConnected) T.ink else Color.White
-            ),
-            shape = CircleShape,
-            modifier = Modifier
-                .height(56.dp)
-                .width(220.dp)
-                .border(
-                    width = if (isConnected) 1.5.dp else 0.dp,
-                    color = if (isConnected) T.ink else Color.Transparent,
-                    shape = CircleShape
-                )
-        ) {
-            Text(
-                text = if (isConnected) "Disconnect" else if (isConnecting) "Cancel" else if (isPaused) "Resume now" else "Connect",
-                fontSize = 15.sp,
-                fontWeight = FontWeight.SemiBold,
-                letterSpacing = 0.3.sp
-            )
+        val actionLabel = when {
+            isConnected -> "Disconnect"
+            isConnecting -> "Cancel"
+            isPaused -> "Resume now"
+            else -> "Connect"
+        }
+        // Stopping is the quiet action; starting or resuming is the primary one.
+        if (isConnected || isConnecting) {
+            SecondaryButton(text = actionLabel, onClick = onPrimaryAction, modifier = Modifier.fillMaxWidth())
+        } else {
+            PrimaryButton(text = actionLabel, onClick = onPrimaryAction, modifier = Modifier.fillMaxWidth())
         }
 
         if (connectionState.canPause) {
             Spacer(modifier = Modifier.height(20.dp))
             PauseOptions(onPause = onPause)
         } else if (isPaused) {
-            Spacer(modifier = Modifier.height(8.dp))
-            Text("Android may delay automatic resume.", fontSize = 12.sp, color = T.mute)
-            TextButton(onClick = onDisconnect) {
-                Text("Disconnect", fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = T.ink2)
-            }
-        }
-
-        Spacer(modifier = Modifier.weight(1f))
-
-        // Bottom Card
-        Box(
-            modifier = Modifier
-                .padding(horizontal = 16.dp)
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(18.dp))
-                .background(T.surface)
-                .border(1.dp, T.line, RoundedCornerShape(18.dp))
-                .clickable { onOpenSettings() }
-                .padding(16.dp)
-        ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween,
-                modifier = Modifier.fillMaxWidth()
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 8.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
             ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(
-                        Icons.Default.Settings,
-                        contentDescription = null,
-                        tint = T.ink,
-                        modifier = Modifier.size(26.dp),
-                    )
-                    Spacer(modifier = Modifier.width(14.dp))
-                    Column {
-                        Text("ADVANCED", fontFamily = MaterialTheme.typography.labelSmall.fontFamily, fontSize = 9.sp, letterSpacing = 1.5.sp, color = T.mute)
-                        Text("Split Tunneling", fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = T.ink)
-                    }
+                Text("Android may delay automatic resume.", fontSize = 12.sp, color = T.mute)
+                TextButton(onClick = onDisconnect) {
+                    Text("Disconnect", style = MaterialTheme.typography.labelLarge, color = T.ink2)
                 }
-                Text("›", fontSize = 24.sp, color = T.mute, fontFamily = MaterialTheme.typography.labelSmall.fontFamily)
             }
         }
+
+        Spacer(modifier = Modifier.height(32.dp))
+
+        MaviDivider()
+        DetailRow(label = "Port", value = serverPort.ifEmpty { "—" }, mono = true)
+        MaviDivider()
+        DetailRow(label = "Authentication", value = if (useKeycloak) "Keycloak" else "Pre-shared key")
+        MaviDivider()
+        DetailRow(label = "Protocol", value = if (http2Framing) "TCP · TLS 1.3" else "QUIC · TLS 1.3")
+        MaviDivider()
+        DetailRow(label = "Transport", value = transport)
+        MaviDivider()
+        NavRow(
+            title = "Settings",
+            description = "Transport, MTU and split tunneling",
+            onClick = onOpenSettings,
+            horizontalPadding = 4.dp,
+        )
+        MaviDivider()
     }
 }

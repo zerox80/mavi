@@ -222,13 +222,19 @@ describe('connection list rendering and selection', () => {
     expect(document.getElementById('connection-list').textContent).toContain('No matches.');
   });
 
-  it('selects a connection, persists prefs, and rerenders', async () => {
+  it('selects a connection and updates the focused row after saving', async () => {
     const applyHeroForSelection = vi.fn();
     wireSidebarSearch({ openModal: vi.fn(), applyHeroForSelection });
+    renderConnectionList();
+    const [previous, row] = document.querySelectorAll('.conn-row');
+    row.focus();
 
     await selectConnection('two');
 
     expect(state.prefs.active_id).toBe('two');
+    expect(document.activeElement).toBe(row);
+    expect(row.classList.contains('selected')).toBe(true);
+    expect(previous.classList.contains('selected')).toBe(false);
     expect(savePrefs).toHaveBeenCalledOnce();
     expect(applyHeroForSelection).toHaveBeenCalledOnce();
   });
@@ -258,5 +264,38 @@ describe('connection list rendering and selection', () => {
 
     expect(openModal).toHaveBeenCalledWith('one');
     expect(openModal).toHaveBeenCalledTimes(2);
+  });
+
+  it('opens the editor from the row edit button without selecting the row', () => {
+    const openModal = vi.fn();
+    wireSidebarSearch({ openModal, applyHeroForSelection: vi.fn() });
+    renderConnectionList();
+
+    const rows = document.querySelectorAll('.conn-row');
+    rows[1].querySelector('.row-edit').click();
+
+    expect(openModal).toHaveBeenCalledExactlyOnceWith('two');
+    expect(state.prefs.active_id).toBe('one');
+    expect(savePrefs).not.toHaveBeenCalled();
+  });
+
+  it('selects a focused row with Enter or Space', async () => {
+    wireSidebarSearch({ openModal: vi.fn(), applyHeroForSelection: vi.fn() });
+    renderConnectionList();
+
+    const row = document.querySelectorAll('.conn-row')[1];
+    expect(row.tabIndex).toBe(0);
+    row.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+    await Promise.resolve();
+
+    expect(state.prefs.active_id).toBe('two');
+
+    renderConnectionList();
+    document
+      .querySelectorAll('.conn-row')[0]
+      .dispatchEvent(new KeyboardEvent('keydown', { key: ' ', bubbles: true }));
+    await Promise.resolve();
+
+    expect(state.prefs.active_id).toBe('one');
   });
 });

@@ -1,4 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { invoke } from '../api.js';
 import { normalizePrefs } from '../theme.js';
 import { renderConnectionList } from '../connections.js';
@@ -50,24 +52,8 @@ function savedPrefs() {
 }
 
 function setupDom() {
-  document.body.innerHTML = `
-    <button id="enroll-conn-btn"></button>
-    <div id="enroll-backdrop">
-      <div id="enroll-link-step"></div>
-      <div id="enroll-confirm-step" class="hidden"></div>
-      <input id="enroll-link" />
-      <div id="enroll-label"></div>
-      <div id="enroll-endpoint"></div>
-      <div id="enroll-keycloak"></div>
-      <div id="enroll-realm"></div>
-      <div id="enroll-client"></div>
-      <div id="enroll-pin"></div>
-      <div id="enroll-error" class="hidden"></div>
-      <button id="enroll-cancel"></button>
-      <button id="enroll-redeem"></button>
-      <button id="enroll-import" class="hidden"></button>
-    </div>
-  `;
+  const html = readFileSync(resolve(__dirname, '../index.html'), 'utf8');
+  document.body.innerHTML = new DOMParser().parseFromString(html, 'text/html').body.innerHTML;
 }
 
 describe('webpanel enrollment workflow', () => {
@@ -83,7 +69,8 @@ describe('webpanel enrollment workflow', () => {
   it('redeems once, shows a shortened safe preview, and imports after confirmation', async () => {
     const redeemed = profile({ label: '<img src=x onerror=alert(1)> Enrolled' });
     invoke.mockResolvedValueOnce(redeemed).mockResolvedValueOnce(savedPrefs());
-    openEnrollment();
+    document.querySelector('#sidebar #enroll-conn-btn').click();
+    expect(document.getElementById('enroll-backdrop').classList.contains('visible')).toBe(true);
     document.getElementById('enroll-link').value =
       'https://panel.example.com/enroll/one-time-ticket';
 

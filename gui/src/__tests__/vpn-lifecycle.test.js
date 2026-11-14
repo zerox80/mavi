@@ -4,7 +4,7 @@ import { connect, applyStatus, disconnect, toggleConnection } from '../vpn.js';
 import { invoke } from '../api.js';
 
 vi.mock('../api.js', () => ({ invoke: vi.fn() }));
-vi.mock('../connections.js', () => ({ renderConnectionList: vi.fn() }));
+vi.mock('../connections.js', () => ({ updateConnectionListState: vi.fn() }));
 vi.mock('../toast.js', () => ({
   showToast: vi.fn(), hideToast: vi.fn(), showServiceOfflineHint: vi.fn(),
   daemonHintText: vi.fn(() => 'offline'),
@@ -40,7 +40,7 @@ it('keeps a pending browser login cancellable through service status updates', a
   ]) {
     applyStatus(status);
     expect(state.hero).toBe('connecting');
-    expect(document.getElementById('connect-btn').textContent).toBe('CANCEL');
+    expect(document.getElementById('connect-btn').textContent).toBe('Cancel');
     expect(document.getElementById('connect-btn').disabled).toBe(false);
   }
   await connect();

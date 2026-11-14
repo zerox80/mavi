@@ -1,7 +1,7 @@
 import { beforeEach, expect, it, vi } from 'vitest';
 import { state } from '../state.js';
 import { applyStatus, applyHeroForSelection, connect } from '../vpn.js';
-import { selectConnection, wireSidebarSearch } from '../connections.js';
+import { renderConnectionList, selectConnection, wireSidebarSearch } from '../connections.js';
 import { invoke } from '../api.js';
 
 vi.mock('../api.js', () => ({ invoke: vi.fn() }));
@@ -12,9 +12,7 @@ beforeEach(() => {
   vi.resetAllMocks();
   state.prefsWriteBlocked = false;
   document.body.innerHTML = ['connect-btn', 'ip-readout', 'hero-title',
-    'hero-subtitle', 'hero-node-id', 'hero-lat', 'title-state-label',
-    'hero-status', 'core-label', 'net-node', 'net-endpoint', 'net-ip',
-    'net-service', 'net-protocol', 'net-transport', 'connection-list', 'search',
+    'hero-subtitle', 'hero-status', 'net-endpoint', 'net-service', 'net-protocol', 'net-transport', 'connection-list', 'search',
     'add-conn-btn', 'toast'].map(id => `<div id="${id}"></div>`).join('');
   Object.assign(state, { hero: 'off', running: false, serviceAvailable: true,
     vpnState: 'Stopped', disconnecting: false, connectAttempt: 0,
@@ -26,7 +24,25 @@ beforeEach(() => {
     { id: 'b', label: 'Server B', endpoint: 'b.example:443', http2_framing: true },
   ];
   wireSidebarSearch({ openModal() {}, applyHeroForSelection });
+  renderConnectionList();
   invoke.mockImplementation(async command => command === 'vpn_status' ? connected : undefined);
+});
+
+it('keeps the edit button focused as VPN status updates the existing row', async () => {
+  const row = document.querySelector('.conn-row');
+  const edit = row.querySelector('.row-edit');
+  edit.focus();
+
+  await connect();
+  applyStatus(connected);
+
+  expect(document.activeElement).toBe(edit);
+  expect(row.classList.contains('active')).toBe(true);
+
+  applyStatus({ service_available: true, running: false, state: 'Stopped' });
+
+  expect(document.activeElement).toBe(edit);
+  expect(row.classList.contains('active')).toBe(false);
 });
 
 it('keeps the active server and transport when another profile is selected', async () => {
@@ -35,7 +51,7 @@ it('keeps the active server and transport when another profile is selected', asy
   applyStatus(connected);
   expect(document.getElementById('hero-title').textContent).toBe('Server A');
   expect(document.getElementById('net-endpoint').textContent).toBe('a.example:443');
-  expect(document.getElementById('net-transport').textContent).toBe('RAW QUIC');
+  expect(document.getElementById('net-transport').textContent).toBe('Raw QUIC');
   const rows = document.querySelectorAll('.conn-row');
   expect(rows[0].classList.contains('active')).toBe(true);
   expect(rows[1].classList.contains('selected')).toBe(true);
@@ -50,7 +66,7 @@ it('retains a session snapshot when its saved profile is edited or deleted', asy
   state.prefs.connections = [];
   applyStatus(connected);
   expect(document.getElementById('hero-title').textContent).toBe('Server A');
-  expect(document.getElementById('net-transport').textContent).toBe('RAW QUIC');
+  expect(document.getElementById('net-transport').textContent).toBe('Raw QUIC');
   expect(document.getElementById('connect-btn').disabled).toBe(false);
 });
 

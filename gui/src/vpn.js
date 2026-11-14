@@ -1,7 +1,7 @@
 import { state, $ } from './state.js';
 import { invoke } from './api.js';
 import { showToast, hideToast, showServiceOfflineHint, daemonHintText } from './toast.js';
-import { renderConnectionList } from './connections.js';
+import { updateConnectionListState } from './connections.js';
 import { heroFromVpnStatus, toConfig, friendlyError } from './utils.js';
 import { selectedConnection, rememberSession, displayedConnection } from './session.js';
 
@@ -137,7 +137,7 @@ export function applyStatus(status) {
   const btn = $('connect-btn');
   if (!btn) return;
 
-  $('ip-readout').textContent = status.assigned_ip || '—';
+  setText('ip-readout', status.assigned_ip || '—');
 
   if (!state.serviceAvailable && !state.pendingConnect && !state.disconnectPending) {
     state.disconnecting = false;
@@ -176,11 +176,11 @@ export function applyStatus(status) {
   } else if (nextHero === 'connecting') {
     setHero('connecting');
     if (state.vpnState === 'Starting') {
-      btn.textContent = 'CONNECTING...';
+      btn.textContent = 'Connecting…';
     }
     // A mid-session drop that is being auto-retried: show a calm, non-error
     // hint instead of the old red failure toast. First-time connects (Starting)
-    // stay silent — the hero already reads "ESTABLISHING TUNNEL".
+    // stay silent — the status pill already reads "Connecting".
     if (state.vpnState === 'Reconnecting') {
       btn.disabled = false;
       btn.title = 'Disconnect';
@@ -211,60 +211,49 @@ export function setHero(s) {
 
   btn.textContent =
     s === 'on'
-      ? 'DISCONNECT'
+      ? 'Disconnect'
       : s === 'connecting'
         ? state.vpnState === 'Reconnecting'
-          ? 'DISCONNECT'
-          : 'CANCEL'
+          ? 'Disconnect'
+          : 'Cancel'
         : s === 'disconnecting'
-          ? 'DISCONNECTING...'
-          : 'CONNECT';
+          ? 'Disconnecting…'
+          : 'Connect';
   if (s === 'connecting' || s === 'disconnecting') {
     btn.disabled = s === 'disconnecting';
   }
 
   const labels = {
-    off: 'NOT CONNECTED',
-    connecting: 'ESTABLISHING TUNNEL',
-    disconnecting: 'DISCONNECTING',
-    on: 'ENCRYPTED',
+    off: 'Not connected',
+    connecting: 'Connecting',
+    disconnecting: 'Disconnecting',
+    on: 'Connected',
   };
-  $('title-state-label').textContent = labels[s];
-
-  const heroStatus = {
-    off: '// NOT CONNECTED',
-    connecting: '// ESTABLISHING TUNNEL',
-    disconnecting: '// DISCONNECTING',
-    on: '// ENCRYPTED',
-  };
-  $('hero-status').textContent = heroStatus[s];
-
-  $('core-label').textContent =
-    s === 'connecting' ? 'HANDSHAKE' : s === 'disconnecting' ? 'CLEANUP' : 'TUNNEL';
+  setText('hero-status', labels[s]);
+  // The tunnel address is only meaningful while the tunnel is up.
+  if (s !== 'on') setText('ip-readout', '—');
 
   applyHeroForSelection();
-  renderConnectionList();
+  updateConnectionListState();
 }
 
 export function applyHeroForSelection() {
   const conn = displayedConnection();
   if (conn) {
-    $('hero-title').textContent = conn.label;
-    $('hero-subtitle').textContent =
+    setText('hero-title', conn.label);
+    setText(
+      'hero-subtitle',
       state.hero === 'on'
-        ? 'Your traffic is encrypted through this node'
+        ? 'Traffic is routed through this connection'
         : state.hero === 'connecting'
-          ? 'Establishing an encrypted tunnel...'
+          ? 'Establishing a secure connection…'
           : state.hero === 'disconnecting'
-            ? 'Closing tunnel and cleaning up routes'
-            : 'Tunnel your connection through this node';
-    $('hero-node-id').textContent = conn.id.slice(0, 8).toUpperCase() || '—';
-    $('hero-lat').textContent = conn.endpoint.toUpperCase();
+            ? 'Closing the connection and restoring routes'
+            : 'Ready to connect'
+    );
   } else {
-    $('hero-title').textContent = 'No node selected';
-    $('hero-subtitle').textContent = 'Add a saved connection to begin';
-    $('hero-node-id').textContent = '—';
-    $('hero-lat').textContent = 'NO SELECTION';
+    setText('hero-title', 'No connection selected');
+    setText('hero-subtitle', 'Add a connection to get started');
   }
   const btn = $('connect-btn');
   if (btn) {
@@ -278,20 +267,24 @@ export function applyHeroForSelection() {
 
 export function updateNetworkPanel() {
   const conn = displayedConnection();
-  $('net-node').textContent = conn ? conn.label : '—';
-  $('net-endpoint').textContent = conn?.endpoint || '—';
-  $('net-ip').textContent = $('ip-readout').textContent;
-  $('net-service').textContent = state.serviceAvailable ? 'ONLINE' : 'OFFLINE';
-  const protocol = $('net-protocol');
-  const transport = $('net-transport');
+  setText('net-endpoint', conn?.endpoint || '—');
+  setText('net-service', state.serviceAvailable ? 'Running' : 'Offline');
   if (conn?.transportUnknown) {
-    if (protocol) protocol.textContent = '—';
-    if (transport) transport.textContent = '—';
+    setText('net-protocol', '—');
+    setText('net-transport', '—');
   } else if (conn?.http2_framing) {
-    if (protocol) protocol.textContent = 'TCP - TLS 1.3';
-    if (transport) transport.textContent = 'HTTP/2 CONNECT-IP';
+    setText('net-protocol', 'TCP · TLS 1.3');
+    setText('net-transport', 'HTTP/2 CONNECT-IP');
   } else {
-    if (protocol) protocol.textContent = 'QUIC - TLS 1.3';
-    if (transport) transport.textContent = conn?.http3_framing || conn?.censorship_resistant ? 'HTTP/3' : 'RAW QUIC';
+    setText('net-protocol', 'QUIC · TLS 1.3');
+    setText(
+      'net-transport',
+      conn?.http3_framing || conn?.censorship_resistant ? 'HTTP/3' : 'Raw QUIC'
+    );
   }
+}
+
+function setText(id, text) {
+  const el = $(id);
+  if (el) el.textContent = text;
 }
