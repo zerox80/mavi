@@ -9,7 +9,7 @@ This guide describes Linux server deployment and client installation. The server
 Use a repository checkout on a Linux server with Python 3. Run the launcher from the repository root:
 
 ```bash
-./install-server.sh
+sudo ./install-server.sh
 ```
 
 The installer presents these choices:
@@ -39,6 +39,37 @@ The wizard shows the resulting `auth.<domain>` and `panel.<domain>` hostnames be
 Existing secrets are not regenerated. Missing required secrets are generated once with Python's `secrets` module. The inner TUN MTU is always `VPN_MTU=1280`; there are no MTU tests, MTU prompts, or PMTUD setup steps.
 
 Before applying changes, the installer shows a summary and runs read-only checks for Linux, distribution, CPU architecture, memory, free storage, Docker and the `docker compose` plugin, `/dev/net/tun`, host addresses, relevant ports, and DNS names. DNS and address inspection do not use ping and do not prove public reachability. Missing distribution packages are installed only after a separate confirmation that displays the exact commands; the installer never executes a downloaded shell script.
+
+For managed HTTPS, a missing `auth.<domain>` or `panel.<domain>` DNS record blocks
+installation before `.env`, Nginx or containers are changed. The installer shows
+the record to create using public interface addresses, excluding private/VPN and
+container addresses. It then offers retry, setup editing, configuration-only
+saving or cancellation. A local `/etc/hosts` entry does not replace public DNS;
+an existing incorrect AAAA record must also be corrected at the DNS provider.
+
+An existing host Nginx on TCP 80/443 is reused after verifying its host process
+and `nginx -t`. Another proxy/container is identified and left running; choose
+external proxy mode or resolve the conflict yourself. Docker-published ports are
+checked even when a local bind appears to succeed. A permission error is reported
+as a permission error and does not imply the port is occupied.
+
+### Prebuilt images and optional source builds
+
+The default guided setup uses `ghcr.io/zerox80/mavi-vpn:latest` for the VPN and
+`ghcr.io/zerox80/mavi-vpn:panel-latest` for the panel, plus the selected upstream
+Keycloak/PostgreSQL/proxy images. GitHub Actions builds AMD64 and ARM64 images;
+the VPS does not compile Rust. The installer pulls all selected images before
+writing configuration, then starts services with `--no-build --pull never`.
+A pull failure stops the run without silently switching to compilation.
+Image use removes build-time RAM usage; Keycloak and other running services
+still need memory.
+
+`MAVI_IMAGE` and `MAVI_PANEL_IMAGE` can select an alternative published tag/digest.
+For an explicit local build, use `sudo ./install-server.sh --build-from-source`.
+That selection is saved as `MAVI_BUILD_FROM_SOURCE=true` and adds the applicable
+`docker-compose.build.yml` overrides. Reconfiguring defaults to prebuilt images
+unless `--build-from-source` is supplied again. Compose data mounts and database
+volumes remain in the same locations in both modes.
 
 To run only the checks, without writing `.env`, installing packages, or changing containers:
 
@@ -86,7 +117,7 @@ Keycloak and panel subdomains can be served in three ways. New installations def
 
 #### Host Nginx with Let's Encrypt (default)
 
-The installer installs the `nginx` and `certbot` system packages after showing them and asking for confirmation, writes an Mavi site configuration, requests Let's Encrypt certificates with `certbot --nginx`, and enables HTTP-to-HTTPS redirection and the renewal timer. Create DNS records for `auth.<domain>` and, when enabled, `panel.<domain>` that point to this server before running the installer; the installer warns when the names do not resolve.
+The installer detects installed Nginx/Certbot components and installs only missing packages after showing the commands. Enter accepts the `[Y/n]` package prompt; choosing No cancels cleanly. It writes a Mavi site configuration, requests Let's Encrypt certificates with `certbot --nginx`, and enables HTTP-to-HTTPS redirection and the renewal timer. Create DNS records for `auth.<domain>` and, when enabled, `panel.<domain>` that point to this server before running the installer; unresolved names must be fixed or saved for configuration-only setup before applying managed HTTPS.
 
 Nginx terminates HTTPS publicly and forwards to the loopback HTTP ports that Keycloak (`127.0.0.1:18080`) and the panel (`127.0.0.1:18081`) publish. No `COMPOSE_PROFILES` value and no `TRAEFIK_*` variables are written in this mode. If Nginx setup fails, the `.env` file remains written and the installer reports which step to fix before rerunning.
 
@@ -111,6 +142,22 @@ The installer saves the proxy selection as `MAVI_PROXY_MODE` and reuses it on su
 ### Keycloak and panel bootstrap
 
 The Keycloak container imports `mavi-vpn` and the public `mavi-client` PKCE client on an empty database. Keycloak-only mode keeps the manual user-management flow. Its optional `VPN_KEYCLOAK_REQUIRED_ROLE` remains unchanged unless it was absent from a new configuration.
+
+The import uses Keycloak 24's `defaultSignatureAlgorithm` and leaves built-in
+client scopes enabled. PostgreSQL readiness is checked before starting Keycloak.
+The installer detects fatal import/OOM failures from the current container start
+instead of retrying authentication for ten minutes. It also distinguishes a
+ready localhost Keycloak endpoint from a failing public proxy. Existing database
+contents are not removed to fix an import problem. An interrupted panel setup can
+resume initial administrator creation; an existing administrator is not reset.
+
+All installer Compose commands select their environment and files explicitly.
+For a manual Keycloak-only recovery, use:
+
+```bash
+cd backend
+sudo docker compose --env-file .env -f docker-compose.yml -f keycloak/docker-compose.yml up -d keycloak
+```
 
 For panel mode, the installer starts the VPN, Keycloak database, and Keycloak first (plus Traefik only in the legacy Traefik mode). It then waits for the master-admin login and imported realm and uses the Keycloak Admin REST API before starting the panel. The bootstrap performs these idempotent operations:
 

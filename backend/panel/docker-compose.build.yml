@@ -1,0 +1,6 @@
+# Added only when the panel is enabled and --build-from-source was requested.
+services:
+  panel:
+    build:
+      context: ..
+      dockerfile: panel/Dockerfile

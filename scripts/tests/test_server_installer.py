@@ -210,8 +210,7 @@ class ComposeContractTests(unittest.TestCase):
     def test_panel_service_has_required_environment_and_hardening(self):
         content = (ROOT / "backend" / "panel" / "docker-compose.yml").read_text(encoding="utf-8")
         required = [
-            "context: ..\n",
-            "dockerfile: panel/Dockerfile",
+            "image: ${MAVI_PANEL_IMAGE:-ghcr.io/zerox80/mavi-vpn:panel-latest}",
             "MAVI_PANEL_DATABASE_URL: postgresql://mavi_panel:${MAVI_PANEL_DB_PASSWORD}@panel-db:5432/mavi_panel",
             "MAVI_PANEL_PUBLIC_URL: https://panel.${DOMAIN_NAME}",
             "MAVI_PANEL_KEYCLOAK_URL: ${VPN_KEYCLOAK_URL}",
@@ -280,7 +279,6 @@ class ComposeContractTests(unittest.TestCase):
             (backend / "docker-compose.yml").touch()
             with (
                 mock.patch.object(installer, "collect_preflight", return_value=PreflightReport([])),
-                mock.patch.object(installer, "preflight_dns", return_value={}),
                 mock.patch.object(installer, "install_nginx_with_consent") as nginx,
                 mock.patch.object(installer, "start_stack") as stack,
             ):

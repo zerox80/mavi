@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+from dataclasses import replace
 import os
 from pathlib import Path
 import shlex
@@ -27,13 +28,16 @@ try:
         mode_from_environment,
         plan_from_existing,
         save_env,
-        uses_traefik_profile,
         validate_domain,
         validate_username,
     )
     from .keycloak_bootstrap import KeycloakError, bootstrap_panel
     from .preflight import PreflightReport, collect_preflight, docker_install_commands, privileged_commands, read_os_release
-    from .nginx_setup import NginxSetup, NginxSetupError, package_names as nginx_package_names, preflight_dns
+    from .nginx_setup import NginxSetup, NginxSetupError
+    from .packages import missing_nginx_packages
+    from .readiness import explain_network, network_action, network_failures
+    from .images import compose_command, compose_environment, prepare_images, stack_services
+    from .keycloak_diagnostics import check_startup
 except ImportError:  # Direct execution from the repository checkout.
     from config import (
         CLASSIC,
@@ -50,13 +54,16 @@ except ImportError:  # Direct execution from the repository checkout.
         mode_from_environment,
         plan_from_existing,
         save_env,
-        uses_traefik_profile,
         validate_domain,
         validate_username,
     )
     from keycloak_bootstrap import KeycloakError, bootstrap_panel
     from preflight import PreflightReport, collect_preflight, docker_install_commands, privileged_commands, read_os_release
-    from nginx_setup import NginxSetup, NginxSetupError, package_names as nginx_package_names, preflight_dns
+    from nginx_setup import NginxSetup, NginxSetupError
+    from packages import missing_nginx_packages
+    from readiness import explain_network, network_action, network_failures
+    from images import compose_command, compose_environment, prepare_images, stack_services
+    from keycloak_diagnostics import check_startup
 
 MODE_LABELS = {PANEL: "Web panel + Keycloak", KEYCLOAK: "Keycloak only", CLASSIC: "Classic token setup"}
 PROXY_LABELS = {
@@ -115,7 +122,13 @@ def interactive_plan(existing: Mapping[str, str], reconfigure: bool = False) -> 
         print("  3) Cancel")
         action = ask_selection({"1": "continue", "2": "restart", "3": "cancel"})
         if action == "continue":
-            return plan_from_existing(existing)
+            plan = plan_from_existing(existing)
+            if plan.uses_panel and not existing.get("MAVI_PANEL_CLIENT_SECRET"):
+                if confirm("Panel setup is incomplete. Create or verify the initial panel administrator?", True):
+                    plan = replace(plan, create_admin=True,
+                                   admin_username=ask_valid("Panel admin username", validate_username, "panel-admin"),
+                                   admin_email=ask_valid("Panel admin email", valid_email, plan.acme_email or f"admin@{plan.domain}"))
+            return plan
         if action == "cancel":
             return None
         reconfigure = True
@@ -159,7 +172,13 @@ def ask_proxy() -> str:
 
 def argument_plan(args: argparse.Namespace, existing: Mapping[str, str]) -> InstallPlan:
     if existing and not args.reconfigure:
-        return plan_from_existing(existing)
+        plan = plan_from_existing(existing)
+        if args.create_admin:
+            if not plan.uses_panel:
+                raise ConfigurationError("--create-admin is valid only in panel mode.")
+            plan = replace(plan, create_admin=True, admin_username=validate_username(args.admin_username),
+                           admin_email=valid_email(args.admin_email or plan.acme_email or f"admin@{plan.domain}"))
+        return plan
     if not args.mode:
         raise ConfigurationError("--mode is required for a new non-interactive installation.")
     if args.mode == CLASSIC:
@@ -189,6 +208,7 @@ def print_summary(plan: InstallPlan, values: Mapping[str, str], env_path: Path, 
     print(f"  Compose files: {values['COMPOSE_FILE']}")
     print(f"  Environment:   {env_path}")
     print("  VPN MTU:       1280")
+    print(f"  Software:      {'local Rust source build (higher RAM usage)' if plan.build_from_source else 'prebuilt Docker images; no local compilation'}")
     if plan.uses_keycloak:
         print(f"  Keycloak URL:  {values['VPN_KEYCLOAK_URL']}")
         print(f"  Proxy mode:    {PROXY_LABELS[plan.proxy]}")
@@ -210,8 +230,8 @@ def print_report(report: PreflightReport) -> None:
         print(f"  {check.status:<4} {check.name}: {check.detail}")
 
 
-def run(command: list[str], cwd: Path | None = None) -> None:
-    subprocess.run(command, cwd=cwd, check=True)
+def run(command: list[str], cwd: Path | None = None, env: dict[str, str] | None = None) -> None:
+    subprocess.run(command, cwd=cwd, check=True, **({"env": env} if env is not None else {}))
 
 
 def install_docker_with_consent(non_interactive: bool) -> bool:
@@ -235,23 +255,32 @@ def install_docker_with_consent(non_interactive: bool) -> bool:
     return True
 
 
-def install_nginx_with_consent(plan: InstallPlan, non_interactive: bool, proxy_token: str = "") -> bool:
+def install_nginx_with_consent(plan: InstallPlan, non_interactive: bool, proxy_token: str = "") -> bool | None:
     """Install and configure Nginx/Certbot after showing what will run."""
-    packages = nginx_package_names()
-    print("The host Nginx proxy requires these system packages:")
-    print(f"  {', '.join(packages)}")
-    if not non_interactive and not confirm("Install these packages now?", False):
-        return False
-    print("Configuring Nginx and requesting Let's Encrypt certificates...")
+    packages = missing_nginx_packages()
+    commands = privileged_commands([["apt-get", "update"],
+                                   ["apt-get", "install", "-y", "--no-install-recommends", *packages]]) if packages else []
+    if packages:
+        print("Missing Nginx/Certbot packages:")
+        for command in commands:
+            print(f"  {shlex.join(command)}")
+        if not non_interactive and not confirm("Install the missing packages now?", True):
+            print("Package installation declined. The saved configuration is kept; no Mavi containers were started.")
+            return None
+    else:
+        print("Nginx and Certbot are already installed; reusing them.")
     try:
+        for command in commands:
+            run(command)
+        print("Configuring the Mavi Nginx site and requesting Let's Encrypt certificates...")
         NginxSetup().install_and_configure(
             plan.domain,
             plan.uses_panel,
             plan.acme_email,
-            install_packages=True,
+            install_packages=False,
             proxy_token=proxy_token,
         )
-    except (NginxSetupError, OSError) as exc:
+    except (NginxSetupError, OSError, subprocess.CalledProcessError) as exc:
         print(f"Error: Nginx setup failed: {exc}", file=sys.stderr)
         print("Certificates and the Mavi Nginx site were rolled back on failure.", file=sys.stderr)
         return False
@@ -277,13 +306,9 @@ def prepare_private_paths(backend: Path, standalone: bool) -> None:
 
 
 def start_stack(backend: Path, plan: InstallPlan, values: dict[str, str]) -> int:
-    if plan.uses_keycloak:
-        services = ["vpn-server", "keycloak-db", "keycloak"]
-        if plan.proxy == PROXY_TRAEFIK or uses_traefik_profile(values):
-            services.append("traefik")
-        run(["docker", "compose", "up", "-d", "--build", *services], backend)
-    else:
-        run(["docker", "compose", "up", "-d", "--build", "vpn-server"], backend)
+    flags = ["--build"] if plan.build_from_source else ["--no-build", "--pull", "never"]
+    run(compose_command(backend, values, "up", "-d", *flags, *stack_services(plan, values, include_panel=False)),
+        backend, env=compose_environment(values))
     if not plan.uses_panel:
         return 0
     admin = bootstrap_panel(
@@ -292,6 +317,7 @@ def start_stack(backend: Path, plan: InstallPlan, values: dict[str, str]) -> int
         create_admin=plan.create_admin,
         admin_username=plan.admin_username,
         admin_email=plan.admin_email,
+        startup_check=lambda: check_startup(backend, values),
     )
     if admin and admin.created:
         print(f"Created panel administrator: {admin.username}")
@@ -299,7 +325,7 @@ def start_stack(backend: Path, plan: InstallPlan, values: dict[str, str]) -> int
         print("The password must be changed at the first login; it is not stored by the installer.")
     elif admin:
         print(f"Panel administrator already exists; password and existing roles were preserved: {admin.username}")
-    run(["docker", "compose", "up", "-d", "--build", "panel"], backend)
+    run(compose_command(backend, values, "up", "-d", *flags, "panel"), backend, env=compose_environment(values))
     return 0
 
 
@@ -308,6 +334,7 @@ def parser() -> argparse.ArgumentParser:
     result.add_argument("--project-root", type=Path, default=Path(__file__).resolve().parents[2], help=argparse.SUPPRESS)
     result.add_argument("--check", action="store_true", help="run preflight checks without changing files or installing packages")
     result.add_argument("--reconfigure", action="store_true", help="ask setup questions again while preserving existing credentials and data")
+    result.add_argument("--build-from-source", action="store_true", help="compile VPN/panel locally instead of downloading prebuilt images (advanced; uses more RAM)")
     result.add_argument("--non-interactive", action="store_true")
     result.add_argument("--mode", choices=(PANEL, CLASSIC, KEYCLOAK))
     result.add_argument("--domain", default="")
@@ -335,28 +362,46 @@ def main(argv: list[str] | None = None) -> int:
         if plan is None:
             print("Installation cancelled; no configuration was written.")
             return 0
-        if plan.uses_panel and not (root / "panel" / "Dockerfile").is_file():
+        if args.build_from_source:
+            plan = replace(plan, build_from_source=True)
+        if plan.build_from_source and plan.uses_panel and not (root / "panel" / "Dockerfile").is_file():
             raise ConfigurationError(f"Panel Dockerfile not found: {root / 'panel' / 'Dockerfile'}")
-        values, generated = build_configuration(plan, existing)
-        print_summary(plan, values, env_path, generated)
-        report = collect_preflight(plan, values, backend)
-        print_report(report)
-        if plan.proxy == PROXY_NGINX and plan.uses_keycloak:
-            dns = preflight_dns(plan.domain, plan.uses_panel)
-            for warning in dns.get("warnings", []):
-                print(f"Warning: {warning}")
-        if args.check:
-            return 1 if report.failures else 0
-        if report.failures:
+        docker_attempted = False
+        while True:
+            if args.build_from_source:
+                plan = replace(plan, build_from_source=True)
+            values, generated = build_configuration(plan, existing)
+            print_summary(plan, values, env_path, generated)
+            report = collect_preflight(plan, values, backend, network_required=not args.no_start, include_docker=not args.no_start)
+            print_report(report)
+            blockers = network_failures(report)
+            if blockers:
+                explain_network(report)
+            if args.check:
+                return 1 if report.failures else 0
+            if blockers:
+                action = network_action(report, plan, args.non_interactive)
+                if action == "retry":
+                    continue
+                if action == "edit":
+                    plan = interactive_plan(existing, reconfigure=True)
+                    if plan is None:
+                        return 0
+                elif action == "external":
+                    plan = replace(plan, proxy=PROXY_EXTERNAL, acme_email="", existing=False, reconfigure=True)
+                elif action == "save":
+                    args.no_start = True
+                else:
+                    print("Setup stopped before writing configuration or changing containers.")
+                    return 1 if args.non_interactive else 0
+                continue
+            if not report.failures:
+                break
             docker_failure = all(check.name in {"docker", "compose"} for check in report.failures)
-            if args.no_start or not docker_failure or not install_docker_with_consent(args.non_interactive):
+            if args.no_start or docker_attempted or not docker_failure or not install_docker_with_consent(args.non_interactive):
                 print("Preflight failed. No configuration or containers were changed.", file=sys.stderr)
                 return 1
-            report = collect_preflight(plan, values, backend)
-            print_report(report)
-            if report.failures:
-                print("Preflight still fails after Docker installation.", file=sys.stderr)
-                return 1
+            docker_attempted = True
         if args.non_interactive:
             if not args.yes:
                 print("Non-interactive installation requires --yes after reviewing the plan.", file=sys.stderr)
@@ -364,6 +409,8 @@ def main(argv: list[str] | None = None) -> int:
         elif not confirm("Apply this plan?", True):
             print("Installation cancelled; no configuration was written.")
             return 0
+        if not args.no_start:
+            prepare_images(backend, plan, values)
         result = save_env(env_path, values, remove_keys=RECONFIGURE_KEYS if plan.reconfigure else frozenset())
         os.chmod(env_path, 0o600)
         prepare_private_paths(backend, plan.proxy == PROXY_TRAEFIK and plan.uses_keycloak)
@@ -375,12 +422,16 @@ def main(argv: list[str] | None = None) -> int:
             print(f"Existing {env_path} is unchanged.")
         if not args.no_start:
             if plan.proxy == PROXY_NGINX and plan.uses_keycloak:
-                if not install_nginx_with_consent(plan, args.non_interactive, values.get("MAVI_PANEL_PROXY_TOKEN", "")):
+                nginx_ready = install_nginx_with_consent(plan, args.non_interactive, values.get("MAVI_PANEL_PROXY_TOKEN", ""))
+                if nginx_ready is None:
+                    return 0
+                if not nginx_ready:
                     print("Nginx setup failed. The .env file was written; fix the problem and rerun the installer.", file=sys.stderr)
                     return 1
             start_stack(backend, plan, values)
         print("\nInstallation finished.")
-        print("Restart later with: cd backend && docker compose up -d")
+        files = " ".join(f"-f {shlex.quote(file)}" for file in values["COMPOSE_FILE"].split(":"))
+        print(f"Restart later with: cd backend && sudo docker compose --env-file .env {files} up -d --no-build")
         if plan.uses_panel and not args.no_start:
             print(f"Open https://panel.{values['DOMAIN_NAME']} after the panel becomes ready.")
         return 0

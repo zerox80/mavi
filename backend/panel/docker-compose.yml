@@ -27,9 +27,7 @@ services:
       - no-new-privileges:true
 
   panel:
-    build:
-      context: ..
-      dockerfile: panel/Dockerfile
+    image: ${MAVI_PANEL_IMAGE:-ghcr.io/zerox80/mavi-vpn:panel-latest}
     restart: unless-stopped
     user: "${MAVI_PANEL_USER:-1000:1000}"
     cap_drop:

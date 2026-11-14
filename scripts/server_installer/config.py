@@ -39,6 +39,7 @@ RECONFIGURE_KEYS = frozenset({
     "TRAEFIK_BIND_ADDR", "TRAEFIK_HTTP_PORT", "TRAEFIK_HTTPS_PORT",
     "TRAEFIK_ROUTER_ENTRYPOINTS", "TRAEFIK_TLS_ENABLED", "TRAEFIK_ACME_RESOLVER",
     "TRAEFIK_FORWARDED_HEADERS_INSECURE",
+    "MAVI_BUILD_FROM_SOURCE",
 })
 _ENV_LINE = re.compile(r"^\s*(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)\s*=")
 _SAFE_VALUE = re.compile(r"^[A-Za-z0-9_./:@%+,=-]*$")
@@ -59,6 +60,7 @@ class InstallPlan:
     admin_email: str = ""
     existing: bool = False
     reconfigure: bool = False
+    build_from_source: bool = False
 
     @property
     def uses_keycloak(self) -> bool:
@@ -91,7 +93,10 @@ def mode_from_environment(values: Mapping[str, str]) -> str:
     return CLASSIC
 
 
-def compose_file_for_mode(mode: str) -> str:
+def compose_file_for_mode(mode: str, build_from_source: bool = False) -> str:
+    if build_from_source:
+        files = compose_file_for_mode(mode) + ":docker-compose.build.yml"
+        return files + ":panel/docker-compose.build.yml" if mode == PANEL else files
     if mode == PANEL:
         return f"{BASE_COMPOSE}:{KEYCLOAK_COMPOSE}:{PANEL_COMPOSE}"
     if mode == KEYCLOAK:
@@ -152,6 +157,7 @@ def plan_from_existing(values: Mapping[str, str]) -> InstallPlan:
         acme_email=values.get("ACME_EMAIL", ""),
         proxy=proxy_from_environment(values),
         existing=True,
+        build_from_source=parse_bool(values.get("MAVI_BUILD_FROM_SOURCE")),
     )
 
 
@@ -197,7 +203,8 @@ def build_configuration(
             "VPN_MSS_CLAMPING": values.get("VPN_MSS_CLAMPING", "true"),
             "MAVI_WEB_PANEL_ENABLED": "true" if plan.uses_panel else "false",
             "VPN_KEYCLOAK_ENABLED": "true" if plan.uses_keycloak else "false",
-            "COMPOSE_FILE": compose_file_for_mode(plan.mode),
+            "COMPOSE_FILE": compose_file_for_mode(plan.mode, plan.build_from_source),
+            "MAVI_BUILD_FROM_SOURCE": "true" if plan.build_from_source else "false",
             "COMPOSE_PROFILES": values.get(
                 "COMPOSE_PROFILES",
                 "traefik" if plan.proxy == PROXY_TRAEFIK and plan.uses_keycloak else "",

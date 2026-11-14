@@ -27,6 +27,12 @@ class KeycloakError(RuntimeError):
     """Keycloak rejected or could not complete an administrative request."""
 
 
+class KeycloakHttpError(KeycloakError):
+    def __init__(self, message: str, status: int):
+        super().__init__(message)
+        self.status = status
+
+
 @dataclass(frozen=True)
 class AdminResult:
     username: str
@@ -85,7 +91,7 @@ class KeycloakAdmin:
             if exc.code == 404 and allow_not_found:
                 return None
             detail = self._error_detail(exc.code, content)
-            raise KeycloakError(f"Keycloak {method} {path} failed: {detail}") from None
+            raise KeycloakHttpError(f"Keycloak {method} {path} failed: {detail}", exc.code) from None
         except (URLError, TimeoutError, OSError) as exc:
             raise KeycloakError(f"Keycloak {method} {path} failed: {exc}") from exc
         if not content:
@@ -121,10 +127,12 @@ class KeycloakAdmin:
             raise KeycloakError("The Keycloak master-admin response did not contain an access token.")
         self.token = token
 
-    def wait_until_ready(self, timeout: int = 600) -> None:
+    def wait_until_ready(self, timeout: int = 600, startup_check: Callable[[], bool] | None = None) -> None:
         deadline = self.monotonic() + timeout
         last_error = "no response"
+        proxy_failures = 0
         while True:
+            local_ready = startup_check() if startup_check is not None else False
             try:
                 self.authenticate()
                 realm = self._request("GET", f"/admin/realms/{self.realm_path}", allow_not_found=True)
@@ -133,6 +141,12 @@ class KeycloakAdmin:
                 last_error = f"realm {self.realm!r} is not imported yet"
             except KeycloakError as exc:
                 last_error = str(exc)
+                if isinstance(exc, KeycloakHttpError):
+                    if exc.status in (400, 401, 403):
+                        raise KeycloakError(f"Keycloak rejected administrator authentication/permissions: {exc}. Verify the existing administrator credentials; no password was reset.") from exc
+                    proxy_failures = proxy_failures + 1 if local_ready and exc.status in (502, 503, 504) else 0
+                    if proxy_failures >= 3:
+                        raise KeycloakError("Keycloak is ready on localhost:18080, but its public HTTPS proxy still fails. Check the auth hostname's proxy route to http://127.0.0.1:18080; do not reset the database.") from exc
             if self.monotonic() >= deadline:
                 raise KeycloakError(f"Keycloak did not become ready within {timeout} seconds: {last_error}")
             self.sleep(min(5, max(0, deadline - self.monotonic())))
@@ -286,6 +300,7 @@ def bootstrap_panel(
     admin_username: str = "panel-admin",
     admin_email: str = "",
     wait_timeout: int = 600,
+    startup_check: Callable[[], bool] | None = None,
     opener: Any = None,
     sleep: Callable[[float], None] = time.sleep,
     monotonic: Callable[[], float] = time.monotonic,
@@ -306,7 +321,7 @@ def bootstrap_panel(
     )
     if not api.admin_password:
         raise ConfigurationError("KEYCLOAK_ADMIN_PASS is missing from backend/.env.")
-    api.wait_until_ready(wait_timeout)
+    api.wait_until_ready(wait_timeout, startup_check=startup_check)
     roles = [api.ensure_role(name) for name in PANEL_ROLES]
     _, effective_secret = api.ensure_client(
         f"https://panel.{domain}", client_secret, adopt_existing_secret=not configured_secret

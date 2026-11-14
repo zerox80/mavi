@@ -1,8 +1,8 @@
 # Mavi VPN · Docker
 
-[![Publish VPN image](https://github.com/zerox80/mavi-vpn/actions/workflows/publish-server.yml/badge.svg)](https://github.com/zerox80/mavi-vpn/actions/workflows/publish-server.yml)
+[![Publish VPN image](https://github.com/zerox80/mavi/actions/workflows/publish-server.yml/badge.svg)](https://github.com/zerox80/mavi/actions/workflows/publish-server.yml)
 
-A prebuilt [Mavi VPN server](https://github.com/zerox80/mavi-vpn) for Linux VPS hosts.
+A prebuilt [Mavi VPN server](https://github.com/zerox80/mavi) for Linux VPS hosts.
 GitHub Actions compiles the Rust code; your server only downloads the image from GHCR.
 All you need to run it is `compose.yaml` and your own `.env` file.
 
@@ -88,7 +88,7 @@ server; updates only take effect when you run the commands above.
 
 Each published build also has its own tag,
 `build-<run-id>-<attempt>`, listed in the run summary under
-[Actions](https://github.com/zerox80/mavi-vpn/actions/workflows/publish-server.yml).
+[Actions](https://github.com/zerox80/mavi/actions/workflows/publish-server.yml).
 To update or roll back to a specific build, set `MAVI_IMAGE` in `.env` to the
 image with that tag, then run `docker compose pull && docker compose up -d` again.
 You can also pin an immutable image using
@@ -361,7 +361,7 @@ The server removes its managed IPv6 firewall chains during shutdown and skips
 IPv6 tunnel setup on the next start. The host's own IPv6 connectivity and sysctl
 configuration remain in place.
 
-See the [server installation guide](https://github.com/zerox80/mavi-vpn/blob/main/docs/INSTALLATION.md)
+See the [server installation guide](https://github.com/zerox80/mavi/blob/main/docs/INSTALLATION.md)
 for more details.
 
 ## Optional: HTTP/2 and Keycloak
@@ -374,7 +374,7 @@ To use an existing Keycloak server, configure `VPN_KEYCLOAK_ENABLED=true`,
 `VPN_KEYCLOAK_URL`, the realm, and the client ID in `.env`. Roles and scopes are
 optional. A static `VPN_AUTH_TOKEN` is not required when Keycloak is enabled.
 This repository does not include a Keycloak or Traefik stack; the full version
-is available in the [source project](https://github.com/zerox80/mavi-vpn/tree/main/backend).
+is available in the [source project](https://github.com/zerox80/mavi/tree/main/backend).
 
 ## Publishing the image (maintainers)
 
@@ -388,7 +388,7 @@ When switching publishing to this repository, disable the old repository's
 Actions access with write permission if it is currently linked only to the
 old repository.
 
-The `Publish VPN server image` workflow runs when server/build inputs change on
+The `Publish VPN server and panel images` workflow runs when server/build inputs change on
 `main`, is scheduled daily at 06:17 UTC, and can be started manually through
 **Actions → Run workflow**. Server source and build input changes trigger a
 build directly. The daily run also picks up new h2/h3/Quinn fork commits.
@@ -398,9 +398,9 @@ The workflow:
 1. Records the triggering `main` commit from this repository.
 2. Updates all seven `zerox80` fork packages to their latest branch commits
    and verifies their sources using the existing fork verification script.
-3. Builds AMD64 and ARM64 natively on separate GitHub runners using the same
-   source revision and updated `Cargo.lock`. No tests are run.
-4. Publishes `latest` and the build tag only after both builds succeed.
+3. Builds VPN and panel images for AMD64 and ARM64 natively on separate GitHub runners using the same
+   source revision and updated `Cargo.lock`. The realm import and installer tests run in the separate test workflow.
+4. Publishes VPN `latest`/`build-...` and panel `panel-latest`/`panel-build-...` tags only after every component/architecture build succeeds.
 
 The source code and image definition use the same recorded repository revision.
 The publishing workflow refreshes `Cargo.lock` in its build checkout; the existing
@@ -410,7 +410,7 @@ The server revision is recorded in the OCI label `org.opencontainers.image.revis
 the same revision is in `io.mavi-vpn.deployment.revision`.
 
 GHCR authentication automatically uses `GITHUB_TOKEN` with `packages: write`.
-No additional registry secrets are required.
+No additional registry secrets are required. The existing package must grant this repository Actions write access.
 **After the first publication, set the GHCR package visibility to Public:**
 GitHub profile → Packages → `mavi-vpn` → Package settings → Change visibility → Public.
 A public Git repository does not automatically make a new container package
@@ -420,4 +420,4 @@ See the [GitHub Container Registry documentation](https://docs.github.com/en/pac
 ## License
 
 [MIT](LICENSE). The included VPN server comes from
-[zerox80/mavi-vpn](https://github.com/zerox80/mavi-vpn).
+[zerox80/mavi-vpn](https://github.com/zerox80/mavi).

@@ -1,8 +1,6 @@
 services:
   vpn-server:
-    build:
-      context: ..
-      dockerfile: Dockerfile
+    image: ${MAVI_IMAGE:-ghcr.io/zerox80/mavi-vpn:latest}
     container_name: mavi-vpn
     restart: unless-stopped
     network_mode: host # Direct host networking for native IPv6 support

@@ -80,6 +80,18 @@ class SetupQuestionsTests(unittest.TestCase):
         plan, _ = self.plan(["3"])
         self.assertIsNone(plan)
 
+    def test_incomplete_panel_setup_can_resume_initial_admin_creation(self):
+        values = saved_settings(); values.pop("MAVI_PANEL_CLIENT_SECRET")
+        plan, _ = self.plan(["1", "y", "", "person@example.com"], values)
+        self.assertTrue(plan.create_admin)
+        self.assertEqual(plan.admin_email, "person@example.com")
+
+    def test_noninteractive_existing_panel_honors_explicit_create_admin(self):
+        args = installer.parser().parse_args(["--non-interactive", "--create-admin", "--admin-email", "person@example.com"])
+        plan = installer.argument_plan(args, saved_settings())
+        self.assertTrue(plan.create_admin)
+        self.assertEqual(plan.admin_email, "person@example.com")
+
     def test_flag_skips_saved_settings_menu(self):
         plan, output = self.plan(["3", "new.example.com", "2"], force=True)
         self.assertEqual(plan.mode, KEYCLOAK)

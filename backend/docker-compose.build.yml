@@ -1,0 +1,6 @@
+# Optional source build; the guided installer normally pulls a prebuilt image.
+services:
+  vpn-server:
+    build:
+      context: ..
+      dockerfile: docker/server/Dockerfile
