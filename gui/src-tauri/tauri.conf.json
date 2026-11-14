@@ -52,6 +52,7 @@
     },
     "linux": {
       "deb": {
+        "desktopTemplate": "linux/mavi-vpn.desktop",
         "depends": ["pkexec", "iproute2"],
         "files": {
           "/usr/local/bin/mavi-vpn": "../../target/release/mavi-vpn",
@@ -63,6 +64,7 @@
         "replaces": ["mavi-vpn-cli"]
       },
       "rpm": {
+        "desktopTemplate": "linux/mavi-vpn.desktop",
         "depends": ["polkit", "iproute"],
         "postInstallScript": "linux/postinst",
         "preRemoveScript": "linux/prerm",

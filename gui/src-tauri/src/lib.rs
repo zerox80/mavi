@@ -5,6 +5,8 @@
 //! Exposes Tauri commands for the web frontend and manages the system tray.
 
 mod commands;
+#[cfg(target_os = "linux")]
+mod desktop_links;
 mod ipc;
 mod logging;
 mod oauth;
@@ -57,7 +59,11 @@ pub fn run() {
             service_setup::setup_vpn_service,
         ])
         .setup(|app| {
-            #[cfg(any(target_os = "linux", all(debug_assertions, target_os = "windows")))]
+            #[cfg(target_os = "linux")]
+            if let Err(error) = desktop_links::register(app) {
+                tracing::warn!("Could not register enrollment links: {error}");
+            }
+            #[cfg(all(debug_assertions, target_os = "windows"))]
             {
                 use tauri_plugin_deep_link::DeepLinkExt;
                 if let Err(error) = app.deep_link().register_all() {

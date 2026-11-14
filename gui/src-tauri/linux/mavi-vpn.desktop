@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name={{name}}
+Comment={{comment}}
+Exec={{exec}} %u
+Icon={{icon}}
+Terminal=false
+Categories=Network;
+StartupWMClass=mavi-vpn-gui
+MimeType=x-scheme-handler/mavivpn;
