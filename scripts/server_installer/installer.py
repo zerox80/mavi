@@ -202,6 +202,13 @@ def argument_plan(args: argparse.Namespace, existing: Mapping[str, str]) -> Inst
     )
 
 
+def print_keycloak_login(values: Mapping[str, str]) -> None:
+    base_url = values.get("VPN_KEYCLOAK_URL") or f"https://auth.{values['DOMAIN_NAME']}"
+    print(f"  Keycloak admin: {base_url.rstrip('/')}/admin/master/console/")
+    print(f"  Admin account:  {values.get('KEYCLOAK_ADMIN_USER') or 'admin'} (master realm)")
+    print("  Initial password: KEYCLOAK_ADMIN_PASS in backend/.env; the value is not printed.")
+
+
 def print_summary(plan: InstallPlan, values: Mapping[str, str], env_path: Path, generated: set[str]) -> None:
     print("\nInstallation summary")
     print(f"  Mode:          {MODE_LABELS[plan.mode]}")
@@ -211,6 +218,7 @@ def print_summary(plan: InstallPlan, values: Mapping[str, str], env_path: Path, 
     print(f"  Software:      {'local Rust source build (higher RAM usage)' if plan.build_from_source else 'prebuilt Docker images; no local compilation'}")
     if plan.uses_keycloak:
         print(f"  Keycloak URL:  {values['VPN_KEYCLOAK_URL']}")
+        print_keycloak_login(values)
         print(f"  Proxy mode:    {PROXY_LABELS[plan.proxy]}")
     if plan.uses_panel:
         print(f"  Panel URL:     https://panel.{values['DOMAIN_NAME']}")
@@ -430,6 +438,8 @@ def main(argv: list[str] | None = None) -> int:
                     return 1
             start_stack(backend, plan, values)
         print("\nInstallation finished.")
+        if plan.uses_keycloak and not args.no_start:
+            print_keycloak_login(values)
         files = " ".join(f"-f {shlex.quote(file)}" for file in values["COMPOSE_FILE"].split(":"))
         print(f"Restart later with: cd backend && sudo docker compose --env-file .env {files} up -d --no-build")
         if plan.uses_panel and not args.no_start:

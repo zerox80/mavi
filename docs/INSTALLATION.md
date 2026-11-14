@@ -203,7 +203,17 @@ cat data/cert_pin.txt
 
 When censorship-resistant mode uses ECH, the optional client value is in `data/ech_config_hex.txt`. Panel mode distributes the endpoint, certificate PIN, transport, ECH configuration, Keycloak realm, and MTU through its enrollment flow; the static token is not used.
 
-For Keycloak-only mode, open `https://auth.<domain>/`, sign in to the Administration Console with `KEYCLOAK_ADMIN_USER` and `KEYCLOAK_ADMIN_PASS`, select the `mavi-vpn` realm, and create users there. The imported `mavi-client` uses PKCE S256 and the existing desktop and Android callback URIs. Assign `vpn-user` when `VPN_KEYCLOAK_REQUIRED_ROLE=vpn-user` is configured.
+The installer prints the complete Keycloak administrator login URL in its summary
+and after startup: `https://auth.<domain>/admin/master/console/`. The initial
+global administrator belongs to the `master` realm; its username is
+`KEYCLOAK_ADMIN_USER` (default `admin`) and its initial password is stored as
+`KEYCLOAK_ADMIN_PASS` in `backend/.env`. This account is separate from panel/VPN
+users in the `mavi-vpn` realm. The installer does not print the password.
+
+For Keycloak-only mode, use that administrator URL, select the `mavi-vpn` realm,
+and create users there. The imported `mavi-client` uses PKCE S256 and the existing
+desktop and Android callback URIs. Assign `vpn-user` when
+`VPN_KEYCLOAK_REQUIRED_ROLE=vpn-user` is configured.
 
 Certificates, ECH keys, and the VPN private key persist in `backend/data/`. The installer never regenerates them. Back up this directory before deleting containers or volumes.
 
