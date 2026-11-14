@@ -217,7 +217,13 @@ pub mod client {
         }
 
         pub async fn redeem(self) -> Result<EnrollmentProfile, String> {
-            let response = reqwest::Client::new()
+            // Enrollment can be the first HTTP operation, before any OAuth
+            // login has installed the provider required by rustls-no-provider.
+            let _ = rustls::crypto::aws_lc_rs::default_provider().install_default();
+            let http = reqwest::Client::builder()
+                .build()
+                .map_err(|_| "Could not initialize secure enrollment requests".to_string())?;
+            let response = http
                 .post(self.redeem_url.clone())
                 .json(&RedeemRequest {
                     ticket: &self.ticket,
