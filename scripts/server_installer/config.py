@@ -31,6 +31,15 @@ _SECRET_KEYS = (
     "MAVI_PANEL_CLIENT_SECRET",
     "MAVI_PANEL_PROXY_TOKEN",
 )
+# Values owned by the setup questions. Custom network settings and credentials
+# remain in place when the user explicitly starts those questions again.
+RECONFIGURE_KEYS = frozenset({
+    "DOMAIN_NAME", "ACME_EMAIL", "MAVI_PROXY_MODE", "VPN_KEYCLOAK_URL",
+    "MAVI_PANEL_VPN_ENDPOINT", "MAVI_PANEL_TRANSPORT", "COMPOSE_FILE", "COMPOSE_PROFILES",
+    "TRAEFIK_BIND_ADDR", "TRAEFIK_HTTP_PORT", "TRAEFIK_HTTPS_PORT",
+    "TRAEFIK_ROUTER_ENTRYPOINTS", "TRAEFIK_TLS_ENABLED", "TRAEFIK_ACME_RESOLVER",
+    "TRAEFIK_FORWARDED_HEADERS_INSECURE",
+})
 _ENV_LINE = re.compile(r"^\s*(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)\s*=")
 _SAFE_VALUE = re.compile(r"^[A-Za-z0-9_./:@%+,=-]*$")
 
@@ -49,6 +58,7 @@ class InstallPlan:
     admin_username: str = "panel-admin"
     admin_email: str = ""
     existing: bool = False
+    reconfigure: bool = False
 
     @property
     def uses_keycloak(self) -> bool:
@@ -158,6 +168,18 @@ def build_configuration(
 ) -> tuple[dict[str, str], set[str]]:
     """Merge a plan into existing values without replacing existing secrets."""
     values = dict(existing or {})
+    if plan.reconfigure:
+        profiles = [profile.strip() for profile in values.get("COMPOSE_PROFILES", "").split(",")
+                    if profile.strip() and profile.strip() != "traefik"]
+        if plan.uses_keycloak and plan.proxy == PROXY_TRAEFIK:
+            profiles.append("traefik")
+        for key in RECONFIGURE_KEYS:
+            values.pop(key, None)
+        values["COMPOSE_PROFILES"] = ",".join(profiles)
+        # Panel mode needs its role default when the old Keycloak mode had none.
+        # Never clear a nonempty existing restriction when changing modes.
+        if plan.uses_panel and not values.get("VPN_KEYCLOAK_REQUIRED_ROLE"):
+            values.pop("VPN_KEYCLOAK_REQUIRED_ROLE", None)
     generated: set[str] = set()
     if plan.mode not in MODES:
         raise ConfigurationError(f"Unknown installation mode: {plan.mode}")
@@ -212,7 +234,7 @@ def build_configuration(
         values["MAVI_PANEL_VPN_ENDPOINT"] = values.get("MAVI_PANEL_VPN_ENDPOINT") or f"{public_host}:{port}"
         values["MAVI_PANEL_TRANSPORT"] = transport
 
-    if not plan.existing:
+    if not plan.existing or plan.reconfigure:
         values["ACME_EMAIL"] = plan.acme_email or values.get("ACME_EMAIL", "")
         if plan.proxy == PROXY_TRAEFIK:
             values.update(
@@ -311,10 +333,15 @@ def _write_private(path: Path, content: bytes, exclusive: bool = False) -> None:
         os.close(descriptor)
 
 
-def save_env(path: Path, desired: Mapping[str, str]) -> SaveResult:
+def save_env(path: Path, desired: Mapping[str, str], *, remove_keys: frozenset[str] = frozenset()) -> SaveResult:
     original_bytes = path.read_bytes() if path.exists() else b""
     original = original_bytes.decode("utf-8") if original_bytes else ""
-    rendered = update_env_text(original, desired)
+    # Delete only explicitly reset wizard keys that the new mode no longer uses.
+    # Keep the untouched original for the backup, including comments/custom keys.
+    source = "".join(line for line in original.splitlines(keepends=True)
+                     if not ((match := _ENV_LINE.match(line))
+                             and match.group(1) in remove_keys and match.group(1) not in desired))
+    rendered = update_env_text(source, desired)
     if original_bytes and rendered.encode("utf-8") == original_bytes:
         return SaveResult(False)
     path.parent.mkdir(parents=True, exist_ok=True)

@@ -26,7 +26,17 @@ The modes have different authentication behavior:
 - **Classic token setup:** The installer generates a static `VPN_AUTH_TOKEN`. Configure the token/PSK and certificate PIN manually on each client. This mode does not require MFA or Keycloak.
 - **Keycloak only:** The installer enables the existing Keycloak realm and `mavi-client` flow without installing the panel. Create and manage VPN users in the Keycloak Administration Console as before.
 
-An existing `backend/.env` selects the existing mode instead of showing the mode menu. The installer does not switch that mode, regenerate existing secrets, or replace certificates and private keys. Missing required secrets are generated once with Python's `secrets` module. The inner TUN MTU is always `VPN_MTU=1280`; there are no MTU tests, MTU prompts, or PMTUD setup steps.
+When `backend/.env` exists, every interactive start offers **continue with saved settings**, **start setup questions again**, or **cancel**. Continuing keeps the saved mode and settings. Starting again lets you choose the mode, base domain and proxy anew while retaining existing credentials, custom network settings, data, certificates and private keys. Derived URLs and obsolete installer-managed proxy settings are recomputed so a mistyped domain cannot survive in the old Keycloak URL or panel endpoint. Invalid selections, domains, email addresses and usernames can be corrected at the prompt.
+
+To go directly to the setup questions:
+
+```bash
+sudo ./install-server.sh --reconfigure
+```
+
+The wizard shows the resulting `auth.<domain>` and `panel.<domain>` hostnames before applying changes. Use the base domain, for example `example.com`, rather than entering `auth.example.com` when you want `auth.example.com` and `panel.example.com`. The existing `.env` is not changed until the new plan passes preflight and is approved. `--check` and cancelling leave it untouched. Reconfiguration is not an uninstall: it does not remove containers, databases or certificates. Review changes of mode/proxy on an already-running deployment.
+
+Existing secrets are not regenerated. Missing required secrets are generated once with Python's `secrets` module. The inner TUN MTU is always `VPN_MTU=1280`; there are no MTU tests, MTU prompts, or PMTUD setup steps.
 
 Before applying changes, the installer shows a summary and runs read-only checks for Linux, distribution, CPU architecture, memory, free storage, Docker and the `docker compose` plugin, `/dev/net/tun`, host addresses, relevant ports, and DNS names. DNS and address inspection do not use ping and do not prove public reachability. Missing distribution packages are installed only after a separate confirmation that displays the exact commands; the installer never executes a downloaded shell script.
 
@@ -46,6 +56,13 @@ Non-interactive installation uses the same defaults and requires explicit confir
 ```
 
 Use `--proxy external` instead of an ACME email when an existing reverse proxy instance terminates TLS. `--proxy` also accepts `nginx` (default) and `traefik` (legacy standalone). Use `--no-start` to write only the configuration. A new non-interactive installation needs `--mode`; Keycloak and panel modes also need `--domain`.
+
+Non-interactive reruns keep saved settings unless `--reconfigure` is specified.
+With `--reconfigure`, supply the new `--mode`, domain/proxy arguments and `--yes`:
+
+```bash
+sudo ./install-server.sh --non-interactive --reconfigure --mode panel --domain example.com --acme-email admin@example.com --yes
+```
 
 ### Configuration and secret storage
 

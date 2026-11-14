@@ -9,7 +9,7 @@ import shlex
 import shutil
 import subprocess
 import sys
-from typing import Mapping
+from typing import Callable, Mapping
 
 try:
     from .config import (
@@ -19,10 +19,12 @@ try:
         PROXY_EXTERNAL,
         PROXY_NGINX,
         PROXY_TRAEFIK,
+        RECONFIGURE_KEYS,
         ConfigurationError,
         InstallPlan,
         build_configuration,
         load_env,
+        mode_from_environment,
         plan_from_existing,
         save_env,
         uses_traefik_profile,
@@ -40,10 +42,12 @@ except ImportError:  # Direct execution from the repository checkout.
         PROXY_EXTERNAL,
         PROXY_NGINX,
         PROXY_TRAEFIK,
+        RECONFIGURE_KEYS,
         ConfigurationError,
         InstallPlan,
         build_configuration,
         load_env,
+        mode_from_environment,
         plan_from_existing,
         save_env,
         uses_traefik_profile,
@@ -86,35 +90,62 @@ def valid_email(value: str) -> str:
     return value
 
 
-def interactive_plan(existing: Mapping[str, str]) -> InstallPlan:
-    if existing:
-        plan = plan_from_existing(existing)
-        print(f"Existing backend/.env detected: {MODE_LABELS[plan.mode]}.")
-        print("The installation mode and existing secrets will be preserved.")
-        return plan
+def ask_valid(question: str, validator: Callable[[str], str], default: str = "") -> str:
+    while True:
+        try:
+            return validator(ask(question, default))
+        except ConfigurationError as exc:
+            print(f"Invalid input: {exc}")
+
+
+def ask_selection(options: Mapping[str, str], default: str = "1") -> str:
+    while True:
+        choice = ask("Selection", default)
+        if choice in options:
+            return options[choice]
+        print(f"Choose {', '.join(options)}.")
+
+
+def interactive_plan(existing: Mapping[str, str], reconfigure: bool = False) -> InstallPlan | None:
+    if existing and not reconfigure:
+        print(f"Existing backend/.env detected: {MODE_LABELS[mode_from_environment(existing)]}.")
+        print(f"Saved base domain: {existing.get('DOMAIN_NAME') or '(not set)'}")
+        print("  1) Continue with saved settings")
+        print("  2) Start setup questions again (keep credentials and data)")
+        print("  3) Cancel")
+        action = ask_selection({"1": "continue", "2": "restart", "3": "cancel"})
+        if action == "continue":
+            return plan_from_existing(existing)
+        if action == "cancel":
+            return None
+        reconfigure = True
+    if reconfigure:
+        print("Domain, proxy and derived URLs will be configured again. Existing credentials, data and certificates are kept.")
+        print("The current .env is backed up and replaced only after you approve the new plan.")
     print("Select an installation mode:")
     print("  1) Web panel + Keycloak (Recommended)")
     print("  2) Classic token setup")
     print("  3) Advanced: Keycloak only")
-    choice = ask("Selection", "1")
     modes = {"1": PANEL, "2": CLASSIC, "3": KEYCLOAK}
-    if choice not in modes:
-        raise ConfigurationError("Choose 1, 2, or 3.")
-    mode = modes[choice]
+    mode = ask_selection(modes)
     if mode == CLASSIC:
-        return InstallPlan(mode)
-    domain = validate_domain(ask("Base domain for auth and panel subdomains"))
+        return InstallPlan(mode, reconfigure=reconfigure)
+    print("Enter the base domain, e.g. example.com; this creates auth.example.com and panel.example.com.")
+    domain = ask_valid("Base domain for auth and panel subdomains", validate_domain)
+    print(f"Keycloak hostname: auth.{domain}")
+    if mode == PANEL:
+        print(f"Panel hostname: panel.{domain}")
     proxy = ask_proxy()
     email = ""
     if proxy in (PROXY_NGINX, PROXY_TRAEFIK):
-        email = valid_email(ask("Let's Encrypt notification email", f"admin@{domain}"))
+        email = ask_valid("Let's Encrypt notification email", valid_email, f"admin@{domain}")
     create_admin = mode == PANEL and confirm("Create the initial panel administrator?", True)
     username = "panel-admin"
     admin_email = email or f"admin@{domain}"
     if create_admin:
-        username = validate_username(ask("Panel admin username", username))
-        admin_email = valid_email(ask("Panel admin email", admin_email))
-    return InstallPlan(mode, domain, email, proxy, create_admin, username, admin_email)
+        username = ask_valid("Panel admin username", validate_username, username)
+        admin_email = ask_valid("Panel admin email", valid_email, admin_email)
+    return InstallPlan(mode, domain, email, proxy, create_admin, username, admin_email, reconfigure=reconfigure)
 
 
 def ask_proxy() -> str:
@@ -122,20 +153,17 @@ def ask_proxy() -> str:
     print("  1) Host Nginx with automatic Let's Encrypt certificates (Recommended)")
     print("  2) External reverse proxy (advanced: you terminate HTTPS yourself)")
     print("  3) Traefik containers (legacy standalone mode)")
-    choice = ask("Selection", "1")
     proxies = {"1": PROXY_NGINX, "2": PROXY_EXTERNAL, "3": PROXY_TRAEFIK}
-    if choice not in proxies:
-        raise ConfigurationError("Choose 1, 2, or 3.")
-    return proxies[choice]
+    return ask_selection(proxies)
 
 
 def argument_plan(args: argparse.Namespace, existing: Mapping[str, str]) -> InstallPlan:
-    if existing:
+    if existing and not args.reconfigure:
         return plan_from_existing(existing)
     if not args.mode:
         raise ConfigurationError("--mode is required for a new non-interactive installation.")
     if args.mode == CLASSIC:
-        return InstallPlan(CLASSIC)
+        return InstallPlan(CLASSIC, reconfigure=args.reconfigure)
     proxy = args.proxy or PROXY_NGINX
     domain = validate_domain(args.domain)
     email = valid_email(args.acme_email or f"admin@{domain}") if proxy in (PROXY_NGINX, PROXY_TRAEFIK) else ""
@@ -151,6 +179,7 @@ def argument_plan(args: argparse.Namespace, existing: Mapping[str, str]) -> Inst
         create_admin=args.create_admin,
         admin_username=validate_username(args.admin_username),
         admin_email=valid_email(args.admin_email or email) if args.create_admin else "",
+        reconfigure=args.reconfigure,
     )
 
 
@@ -167,6 +196,8 @@ def print_summary(plan: InstallPlan, values: Mapping[str, str], env_path: Path, 
         print(f"  Panel URL:     https://panel.{values['DOMAIN_NAME']}")
         print(f"  VPN endpoint:  {values['MAVI_PANEL_VPN_ENDPOINT']}")
         print(f"  Initial admin: {'yes' if plan.create_admin else 'no'}")
+    if plan.reconfigure:
+        print("  Reconfigure:   setup answers and derived URLs; existing credentials and data are retained")
     if generated:
         print(f"  New secrets:   {', '.join(sorted(generated))} (values are not printed)")
     elif plan.existing:
@@ -276,6 +307,7 @@ def parser() -> argparse.ArgumentParser:
     result = argparse.ArgumentParser(description=__doc__)
     result.add_argument("--project-root", type=Path, default=Path(__file__).resolve().parents[2], help=argparse.SUPPRESS)
     result.add_argument("--check", action="store_true", help="run preflight checks without changing files or installing packages")
+    result.add_argument("--reconfigure", action="store_true", help="ask setup questions again while preserving existing credentials and data")
     result.add_argument("--non-interactive", action="store_true")
     result.add_argument("--mode", choices=(PANEL, CLASSIC, KEYCLOAK))
     result.add_argument("--domain", default="")
@@ -299,7 +331,10 @@ def main(argv: list[str] | None = None) -> int:
         if not (backend / "docker-compose.yml").is_file():
             raise ConfigurationError(f"Backend Compose file not found: {backend / 'docker-compose.yml'}")
         existing = load_env(env_path)
-        plan = argument_plan(args, existing) if args.non_interactive else interactive_plan(existing)
+        plan = argument_plan(args, existing) if args.non_interactive else interactive_plan(existing, args.reconfigure)
+        if plan is None:
+            print("Installation cancelled; no configuration was written.")
+            return 0
         if plan.uses_panel and not (root / "panel" / "Dockerfile").is_file():
             raise ConfigurationError(f"Panel Dockerfile not found: {root / 'panel' / 'Dockerfile'}")
         values, generated = build_configuration(plan, existing)
@@ -329,7 +364,7 @@ def main(argv: list[str] | None = None) -> int:
         elif not confirm("Apply this plan?", True):
             print("Installation cancelled; no configuration was written.")
             return 0
-        result = save_env(env_path, values)
+        result = save_env(env_path, values, remove_keys=RECONFIGURE_KEYS if plan.reconfigure else frozenset())
         os.chmod(env_path, 0o600)
         prepare_private_paths(backend, plan.proxy == PROXY_TRAEFIK and plan.uses_keycloak)
         if result.changed:
@@ -349,13 +384,14 @@ def main(argv: list[str] | None = None) -> int:
         if plan.uses_panel and not args.no_start:
             print(f"Open https://panel.{values['DOMAIN_NAME']} after the panel becomes ready.")
         return 0
-    except KeyboardInterrupt:
+    except (KeyboardInterrupt, EOFError):
         print("\nInstallation cancelled.", file=sys.stderr)
         return 130
     except (ConfigurationError, KeycloakError, OSError, subprocess.CalledProcessError) as exc:
         print(f"Error: {exc}", file=sys.stderr)
         if env_path.exists():
             print("The protected .env file was preserved. Fix the error and rerun the installer; it is safe to repeat.", file=sys.stderr)
+            print("To correct saved setup answers, rerun with --reconfigure.", file=sys.stderr)
         return 1
 
 

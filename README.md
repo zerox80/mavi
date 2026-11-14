@@ -75,7 +75,7 @@ cd mavi-vpn
 ./install-server.sh
 ```
 
-The recommended setup enables the web panel and Keycloak together. After confirmation, the installer sets up missing Docker packages, generates secrets, configures Nginx for `panel.<domain>` and `auth.<domain>`, obtains and renews Let's Encrypt certificates, and starts the services. The classic setup keeps the existing static-token and certificate-PIN workflow; Keycloak without the panel remains available in advanced mode. Existing installations retain their selected mode and stored secrets.
+The recommended setup enables the web panel and Keycloak together. After confirmation, the installer sets up missing Docker packages, generates secrets, configures Nginx for `panel.<domain>` and `auth.<domain>`, obtains and renews Let's Encrypt certificates, and starts the services. The classic setup keeps the existing static-token and certificate-PIN workflow; Keycloak without the panel remains available in advanced mode. Existing installations offer a choice to continue saved settings or enter them again; `sudo ./install-server.sh --reconfigure` goes directly to the questions. Existing credentials and data are retained, and the previous `.env` is backed up before an approved change.
 
 The inner TUN MTU remains `1280` and the derived QUIC transport MTU remains `1360`; no MTU test or additional prompt is required. See [docs/INSTALLATION.md](docs/INSTALLATION.md) for firewall requirements and manual deployment options.
 
