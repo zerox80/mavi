@@ -9,6 +9,7 @@ mod ipc;
 mod logging;
 mod oauth;
 mod secret_store;
+mod service_setup;
 mod storage;
 mod tray;
 
@@ -53,6 +54,7 @@ pub fn run() {
             load_config,
             load_prefs,
             save_prefs,
+            service_setup::setup_vpn_service,
         ])
         .setup(|app| {
             #[cfg(any(target_os = "linux", all(debug_assertions, target_os = "windows")))]

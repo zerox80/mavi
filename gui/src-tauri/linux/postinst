@@ -8,13 +8,13 @@ if ! getent group mavivpn >/dev/null; then
 fi
 
 # Grant access to the user who explicitly installed through sudo. Package
-# managers without an invoking desktop user need an explicit administrator step.
+# managers without an invoking desktop user are handled by the GUI's Polkit
+# setup prompt. Never guess a username or grant every local user control.
 if [ -n "${SUDO_USER:-}" ] && [ "$SUDO_USER" != root ]; then
     usermod -a -G mavivpn "$SUDO_USER"
-    echo "Mavi VPN: $SUDO_USER was added to mavivpn. Log out and back in before using the GUI/CLI."
+    echo "Mavi VPN: $SUDO_USER was added to mavivpn."
 else
-    echo "Mavi VPN: grant a trusted desktop user access with: sudo usermod -aG mavivpn USER"
-    echo "Then log out and back in before using the GUI/CLI."
+    echo "Mavi VPN: open the GUI and approve its system prompt to enable VPN access."
 fi
 
 if command -v systemctl >/dev/null && [ -d /run/systemd/system ]; then

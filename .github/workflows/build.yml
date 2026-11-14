@@ -129,12 +129,18 @@ jobs:
         working-directory: gui
         run: npm run tauri -- build
 
+      - name: Add GUI installation instructions
+        run: |
+          mkdir -p dist/linux-gui
+          cp gui/src-tauri/linux/README.txt dist/linux-gui/README.txt
+
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: linux-gui
           path: |
             target/release/bundle/deb/*.deb
             target/release/bundle/rpm/*.rpm
+            dist/linux-gui/README.txt
 
   # ── Windows GUI (Tauri) ───────────────────────────────────────────────────────
   windows-gui:

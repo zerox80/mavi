@@ -35,6 +35,9 @@ export function showServiceOfflineHint(error) {
 }
 
 export function daemonHintText(error) {
+  if (navigator.platform.toLowerCase().includes('linux')) {
+    return 'VPN service access needs setup. Approve the system prompt or select Set up VPN service.';
+  }
   if (error) return `Daemon unavailable: ${String(error)}`;
   return navigator.platform.toLowerCase().includes('win')
     ? 'Daemon offline. Run: net start MaviVPNService'

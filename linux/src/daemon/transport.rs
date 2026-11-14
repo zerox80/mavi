@@ -97,6 +97,7 @@ pub(super) fn write_ipc_token_with_access(
     }
 
     std::fs::set_permissions(token_path, std::fs::Permissions::from_mode(access.mode()))?;
+    super::access::grant_group_access(token_path)?;
 
     match access {
         IpcTokenAccess::RootOnly => warn!(
@@ -147,6 +148,7 @@ pub(super) fn bind_ipc_socket_at(
         socket_path,
         std::fs::Permissions::from_mode(access.socket_mode()),
     )?;
+    super::access::grant_group_access(socket_path)?;
 
     Ok(listener)
 }

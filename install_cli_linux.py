@@ -211,7 +211,7 @@ def main():
     print(c("0;37",  "    mavi-vpn stop                     disconnect"))
     print(c("0;37",  "    mavi-vpn status"))
     if configured_user:
-        print(c("1;33", f"\n  Log out and back in as '{configured_user}', then run:"))
+        print(c("0;37", f"\n  With the daemon running, test access as '{configured_user}':"))
         print(c("0;37",  "    mavi-vpn status"))
         print(c("0;37",  "  or start the Mavi VPN GUI."))
     else:

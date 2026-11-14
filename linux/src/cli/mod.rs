@@ -2,6 +2,7 @@ mod config;
 mod daemon_credentials;
 mod enrollment;
 mod secrets;
+mod service_setup;
 
 use crate::{daemon, vpn_core};
 use anyhow::{Context, Result};
@@ -57,6 +58,7 @@ pub fn run() {
         "stop" => config_path(&args).and_then(run_ipc_stop),
         "repair" => run_repair(&args[1..]),
         "enroll" => enrollment::run(&args[1..]),
+        "setup-service" => service_setup::run(),
 
         "status" => {
             run_status();

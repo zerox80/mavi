@@ -364,6 +364,22 @@ or full token exchange responses. Redact logs before sharing.
 
 ## 3. Linux Client Installation
 
+### Download the GUI (no build tools needed)
+
+Download **linux-gui** from a successful **Build Clients** Actions run. Extract
+the ZIP and install its RPM on Fedora/RHEL or DEB on Ubuntu/Debian using your
+desktop's package installer. The GUI package includes the daemon and systemd
+service; the separate **linux-cli** artifact is for CLI-only installations.
+
+Launch Mavi VPN from the application menu. If daemon access needs setup, the app
+opens the normal system authorization prompt. Approve it once to enable your
+own desktop account. Setup starts the service if needed and grants access without
+requiring a logout or restarting an already active VPN session. Cancelling the
+prompt leaves a **Set up VPN service** button to retry. This requires systemd
+and a desktop Polkit authorization agent; the GUI stays unprivileged.
+
+The following instructions are for building from source instead.
+
 ### Prerequisites
 * **Rust (Cargo)** — https://rustup.rs
 * **Python 3** (for the install scripts)
@@ -393,7 +409,7 @@ sudo install -m 755 target/release/mavi-vpn /usr/local/bin/
 # Allow the current desktop user to control the root daemon
 sudo groupadd --system --force mavivpn
 sudo usermod -aG mavivpn $USER
-# Log out and back in before using daemon mode without sudo.
+# Starting the daemon grants access to named mavivpn group members immediately.
 
 # Install systemd service (optional)
 sudo cp linux/mavi-vpn.service /etc/systemd/system/

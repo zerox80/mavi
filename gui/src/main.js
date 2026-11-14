@@ -5,6 +5,7 @@ import { wireSidebarSearch, renderConnectionList, migrateLegacyConfig } from './
 import { wireModal, openModal } from './modal.js';
 import { wireEnrollment } from './enrollment.js';
 import { wireDesktopEnrollmentLinks } from './deep-links.js';
+import { wireServiceSetup } from './service-setup.js';
 import {
   wireHero,
   refreshStatus,
@@ -29,6 +30,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   wireEnrollment({ applyHeroForSelection });
   wireHero();
   wireThemeToggle();
+  wireServiceSetup({ refresh: refreshStatus });
   wireShortcuts();
 
   // Only enable writes after the saved profiles and secrets were read successfully.

@@ -4,6 +4,7 @@ import { showToast, hideToast, showServiceOfflineHint, daemonHintText } from './
 import { updateConnectionListState } from './connections.js';
 import { heroFromVpnStatus, toConfig, friendlyError } from './utils.js';
 import { selectedConnection, rememberSession, displayedConnection } from './session.js';
+import { updateServiceSetup } from './service-setup.js';
 
 export function wireHero() {
   $('connect-btn').addEventListener('click', () => toggleConnection());
@@ -124,6 +125,7 @@ export async function refreshStatus() {
 }
 
 export function applyStatus(status) {
+  updateServiceSetup(status);
   state.serviceAvailable = !!status.service_available;
   state.running = !!status.running;
   state.activeEndpoint = status.endpoint || null;

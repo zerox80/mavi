@@ -15,6 +15,7 @@ use tokio::sync::{Mutex, OwnedSemaphorePermit, Semaphore};
 
 use tracing::{error, info, warn};
 
+pub(crate) mod access;
 mod credentials;
 mod scoped;
 mod transport;

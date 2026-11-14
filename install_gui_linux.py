@@ -177,7 +177,7 @@ def ensure_daemon():
 
     target_user = configure_ipc_group()
     if target_user:
-        warn(f"Log out and back in as '{target_user}' before using the GUI.")
+        info(f"Daemon access will be enabled for '{target_user}' when the service starts.")
 
     if shutil.which("systemctl"):
         result = run_capture(["systemctl", "is-active", "mavi-vpn"])

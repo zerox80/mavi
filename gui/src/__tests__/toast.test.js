@@ -53,8 +53,8 @@ describe('toast helpers', () => {
 
   it('shows Linux and Windows service hints without replacing hard errors', () => {
     showServiceOfflineHint();
-    expect(document.getElementById('toast').innerHTML).toContain('sudo systemctl start mavi-vpn');
-    expect(daemonHintText()).toBe('Daemon offline. Run: sudo systemctl start mavi-vpn');
+    expect(document.getElementById('toast').textContent).toContain('Set up VPN service');
+    expect(daemonHintText()).not.toContain('sudo');
 
     setPlatform('Win32');
     showServiceOfflineHint();
@@ -72,9 +72,9 @@ describe('toast helpers', () => {
     showServiceOfflineHint(error);
 
     const toast = document.getElementById('toast');
-    expect(toast.textContent).toContain(error);
+    expect(toast.textContent).toContain('Approve the system prompt');
     expect(toast.textContent).not.toContain('systemctl start');
     expect(toast.querySelector('script')).toBeNull();
-    expect(daemonHintText(error)).toContain('permission denied');
+    expect(daemonHintText(error)).toContain('Set up VPN service');
   });
 });
