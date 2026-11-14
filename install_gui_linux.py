@@ -90,10 +90,11 @@ DESKTOP_ENTRY = """\
 Name=Mavi VPN
 GenericName=VPN Client
 Comment=QUIC-based VPN client with Keycloak SSO
-Exec={exec}
+Exec={exec} %u
 Icon=mavi-vpn-gui
 Terminal=false
 Type=Application
+MimeType=x-scheme-handler/mavivpn;
 Categories=Network;
 Keywords=vpn;network;mavi;secure;quic;tunnel;
 StartupNotify=true
@@ -156,6 +157,8 @@ def create_desktop_entry(exec_path: str):
     ok(f".desktop entry: {dest}")
     if shutil.which("update-desktop-database"):
         subprocess.run(["update-desktop-database", str(desktop_dir)], check=False)
+    if shutil.which("xdg-mime"):
+        subprocess.run(["xdg-mime", "default", dest.name, "x-scheme-handler/mavivpn"], check=False)
     ok("GNOME search updated")
 
 def ensure_daemon():

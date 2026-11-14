@@ -213,6 +213,8 @@ cat data/cert_pin.txt
 
 When censorship-resistant mode uses ECH, the optional client value is in `data/ech_config_hex.txt`. Panel mode distributes the endpoint, certificate PIN, transport, ECH configuration, Keycloak realm, and MTU through its enrollment flow; the static token is not used.
 
+On Linux, launch the installed Mavi GUI once to register its `mavivpn://` link handler. The panel's **Open in Mavi** button then brings the existing window forward or starts the app and fills the enrollment dialog. Select **Review** to redeem the ticket, inspect the returned profile, and save it explicitly. Opening a link does not start the VPN or consume the ticket by itself. If another enrollment is already open, finish or cancel it before opening a different link. Copying the HTTPS enrollment link into **Enroll Connection** remains available.
+
 The installer prints the complete Keycloak administrator login URL in its summary
 and after startup: `https://auth.<domain>/admin/master/console/`. The initial
 global administrator belongs to the `master` realm; its username is

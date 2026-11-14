@@ -28,7 +28,18 @@ pub fn run() {
         tracing::info!("GUI log file: {}", path.display());
     }
 
-    tauri::Builder::default()
+    let builder = tauri::Builder::default();
+    #[cfg(desktop)]
+    let builder = builder.plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
+        use tauri::Manager;
+        if let Some(window) = app.get_webview_window("main") {
+            let _ = window.show();
+            let _ = window.unminimize();
+            let _ = window.set_focus();
+        }
+    }));
+    builder
+        .plugin(tauri_plugin_deep_link::init())
         .manage(commands::TokenRefreshHandle::default())
         .manage(commands::ConnectionLifecycle::default())
         .invoke_handler(tauri::generate_handler![
@@ -44,6 +55,13 @@ pub fn run() {
             save_prefs,
         ])
         .setup(|app| {
+            #[cfg(any(target_os = "linux", all(debug_assertions, target_os = "windows")))]
+            {
+                use tauri_plugin_deep_link::DeepLinkExt;
+                if let Err(error) = app.deep_link().register_all() {
+                    tracing::warn!("Could not register enrollment links: {error}");
+                }
+            }
             setup_tray(app)?;
             start_status_poller(app.handle().clone());
             #[cfg(target_os = "windows")]

@@ -4,6 +4,7 @@ import { wireThemeToggle, applyTheme, normalizePrefs } from './theme.js';
 import { wireSidebarSearch, renderConnectionList, migrateLegacyConfig } from './connections.js';
 import { wireModal, openModal } from './modal.js';
 import { wireEnrollment } from './enrollment.js';
+import { wireDesktopEnrollmentLinks } from './deep-links.js';
 import {
   wireHero,
   refreshStatus,
@@ -53,6 +54,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   applyTheme(state.prefs.theme);
   renderConnectionList();
+  await wireDesktopEnrollmentLinks();
 
   startSessionClock();
 

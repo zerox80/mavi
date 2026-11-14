@@ -43,14 +43,19 @@ function updateView() {
   $('enroll-import').textContent = _busy && reviewing ? 'SAVING…' : 'SAVE CONNECTION';
 }
 
-export function openEnrollment() {
-  if (_busy) return;
+export function openEnrollment(link = '') {
+  if (
+    _busy ||
+    (typeof link === 'string' && link && $('enroll-backdrop').classList.contains('visible'))
+  )
+    return false;
   _pendingProfile = null;
-  $('enroll-link').value = '';
+  $('enroll-link').value = typeof link === 'string' ? link : '';
   showError('');
   updateView();
   $('enroll-backdrop').classList.add('visible');
   setTimeout(() => $('enroll-link').focus(), 0);
+  return true;
 }
 
 export function closeEnrollment() {

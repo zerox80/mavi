@@ -3,6 +3,11 @@
   "productName": "Mavi VPN",
   "identifier": "com.mavi.vpn",
   "version": "1.3.0",
+  "plugins": {
+    "deep-link": {
+      "desktop": { "schemes": ["mavivpn"] }
+    }
+  },
   "build": {
     "beforeBuildCommand": "npm run build",
     "beforeDevCommand": "npm run dev",
