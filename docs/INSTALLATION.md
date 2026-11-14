@@ -123,6 +123,8 @@ Keycloak and panel subdomains can be served in three ways. New installations def
 
 The installer detects installed Nginx/Certbot components and installs only missing packages after showing the commands. Enter accepts the `[Y/n]` package prompt; choosing No cancels cleanly. It writes a Mavi site configuration, requests Let's Encrypt certificates with `certbot --nginx`, and enables HTTP-to-HTTPS redirection and the renewal timer. Create DNS records for `auth.<domain>` and, when enabled, `panel.<domain>` that point to this server before running the installer; unresolved names must be fixed or saved for configuration-only setup before applying managed HTTPS.
 
+An existing Certbot installation with the Nginx plugin, including Snap, is reused with its matching renewal timer. Mavi requests its own `mavi-<domain>` certificate and leaves other certificate lineages in place. Existing Nginx syntax and exact hostname conflicts are checked before writing the Mavi site. If another site already owns `auth.<domain>` or `panel.<domain>`, choose other names or deliberately reconfigure that site first. Failures include bounded command diagnostics, with private proxy tokens redacted; incomplete rollback is reported explicitly.
+
 Nginx terminates HTTPS publicly and forwards to the loopback HTTP ports that Keycloak (`127.0.0.1:18080`) and the panel (`127.0.0.1:18081`) publish. No `COMPOSE_PROFILES` value and no `TRAEFIK_*` variables are written in this mode. If Nginx setup fails, the `.env` file remains written and the installer reports which step to fix before rerunning.
 
 Open these firewall ports:

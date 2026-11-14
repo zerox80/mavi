@@ -217,6 +217,9 @@ class NginxSetupTests(unittest.TestCase):
             "--email",
             "admin@example.com",
             "--redirect",
+            "--cert-name",
+            "mavi-example.com",
+            "--keep-until-expiring",
             "-d",
             "auth.example.com",
             "-d",
@@ -225,6 +228,7 @@ class NginxSetupTests(unittest.TestCase):
         self.assertEqual(
             self.runner.commands,
             [
+                ["nginx", "-T"],
                 ["nginx", "-t"],
                 expected_certbot,
                 ["nginx", "-t"],
@@ -322,6 +326,33 @@ class NginxSetupTests(unittest.TestCase):
         setup.install_and_configure("example.com", False, "admin@example.com")
         self.assertEqual(default.read_text(encoding="utf-8"), "foreign default")
         self.assertEqual(other.read_text(encoding="utf-8"), "foreign other")
+
+    def test_foreign_hostname_is_rejected_before_any_files_or_certbot_change(self):
+        def callback(command):
+            dump = "# configuration file /etc/nginx/sites-enabled/keycloak.conf:\nserver { server_name auth.example.com; }\n"
+            return subprocess.CompletedProcess(command, 0, stdout=dump)
+        setup = self.setup(callback)
+        with self.assertRaisesRegex(NginxSetupError, "auth.example.com.*keycloak.conf"):
+            setup.install_and_configure("example.com", True, "admin@example.com")
+        self.assertFalse(self.config.exists())
+        self.assertEqual(self.runner.commands, [["nginx", "-T"]])
+
+    def test_certbot_error_and_incomplete_rollback_are_both_reported(self):
+        def callback(command):
+            if command[0] == "certbot":
+                raise subprocess.CalledProcessError(1, command, stderr="Another instance of Certbot is already running")
+            if command[:2] == ["systemctl", "reload"]:
+                raise subprocess.CalledProcessError(1, command, stderr="reload failed")
+            return subprocess.CompletedProcess(command, 0)
+        setup = self.setup(callback)
+        with self.assertRaisesRegex(NginxSetupError, "(?s)Another instance.*Rollback incomplete.*reload failed"):
+            setup.install_and_configure("example.com", False, "admin@example.com")
+
+    def test_snap_certbot_uses_its_existing_renewal_timer(self):
+        setup = self.setup(which=lambda name: "/snap/bin/certbot" if name == "certbot" else "/bin/systemctl")
+        with mock.patch.object(Path, "resolve", return_value=Path("/usr/bin/snap")):
+            setup._configure_timer()
+        self.assertTrue(all("snap.certbot.renew.timer" in command for command in self.runner.commands))
 
     def test_foreign_mavi_symlink_is_rejected_without_changes(self):
         other = self.available / "other.conf"

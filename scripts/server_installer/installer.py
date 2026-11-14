@@ -292,7 +292,8 @@ def install_nginx_with_consent(plan: InstallPlan, non_interactive: bool, proxy_t
         )
     except (NginxSetupError, OSError, subprocess.CalledProcessError) as exc:
         print(f"Error: Nginx setup failed: {exc}", file=sys.stderr)
-        print("Certificates and the Mavi Nginx site were rolled back on failure.", file=sys.stderr)
+        print("Mavi site rollback was attempted; any rollback failure is reported above. Existing certificate files are retained.", file=sys.stderr)
+        print("Certbot details: /var/log/letsencrypt/letsencrypt.log", file=sys.stderr)
         return False
     print("Nginx is configured and the certificate renewal timer is active.")
     return True

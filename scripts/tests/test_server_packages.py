@@ -10,6 +10,14 @@ from scripts.server_installer.config import InstallPlan, PANEL
 
 
 class ProxyPackageTests(unittest.TestCase):
+    def test_existing_snap_plugin_does_not_install_a_second_certbot(self):
+        def which(name):
+            return {"nginx": "/usr/sbin/nginx", "certbot": "/snap/bin/certbot"}.get(name)
+        with mock.patch.object(packages.shutil, "which", side_effect=which), \
+             mock.patch.object(packages.subprocess, "run", return_value=subprocess.CompletedProcess([], 0, "* nginx\n", "")) as run:
+            self.assertEqual(packages.missing_nginx_packages(), [])
+        self.assertEqual(run.call_args.args[0], ["/snap/bin/certbot", "plugins", "--non-interactive"])
+
     def test_installed_binaries_and_plugin_require_no_packages(self):
         with mock.patch.object(packages.shutil, "which", side_effect=lambda name: "/usr/bin/" + name), \
              mock.patch.object(packages.subprocess, "run", return_value=subprocess.CompletedProcess([], 0, "install ok installed", "")):

@@ -19,6 +19,11 @@ import tempfile
 from dataclasses import dataclass
 from typing import Any, Callable
 
+try:
+    from .nginx_diagnostics import command_details, foreign_hosts
+except ImportError:
+    from nginx_diagnostics import command_details, foreign_hosts
+
 
 _PACKAGES = ["nginx", "certbot", "python3-certbot-nginx"]
 _CONFIG_NAME = "mavi-vpn.conf"
@@ -227,12 +232,14 @@ class NginxSetup:
         self._backup = self._available_dir / f"{_CONFIG_NAME}.mavi-backup"
         self._link = self._enabled_dir / _CONFIG_NAME
         self._proxy_headers = self._available_dir / _PROXY_HEADERS_FILE
+        self._secrets: tuple[str, ...] = ()
 
-    def _command(self, command: list[str], description: str) -> None:
+    def _command(self, command: list[str], description: str) -> str:
         try:
-            self._run(command, check=True, capture_output=True, text=True)
+            result = self._run(command, check=True, capture_output=True, text=True)
+            return getattr(result, "stdout", None) or ""
         except (OSError, subprocess.CalledProcessError) as error:
-            raise NginxSetupError(description) from error
+            raise NginxSetupError(f"{description}:\n{command_details(error, self._secrets)}") from error
 
     @staticmethod
     def _is_symlink(path: Path) -> bool:
@@ -324,22 +331,22 @@ class NginxSetup:
             self._link.unlink()
 
     def _reload_after_rollback(self) -> None:
-        try:
-            self._command(["nginx", "-t"], "Restored Nginx configuration is invalid")
-            self._command(["systemctl", "reload", "nginx"], "Nginx reload after rollback failed")
-        except NginxSetupError:
-            pass
+        self._command(["nginx", "-t"], "Restored Nginx configuration is invalid")
+        self._command(["systemctl", "reload", "nginx"], "Nginx reload after rollback failed")
 
     def _configure_timer(self) -> None:
         if self._which("systemctl") is None:
             return
-        self._command(["systemctl", "enable", "--now", "certbot.timer"], "Certbot timer enable failed")
+        executable = self._which("certbot") or ""
+        snap = Path(executable).resolve().name in {"snap", "snapd"}
+        timer = "snap.certbot.renew.timer" if snap else "certbot.timer"
+        self._command(["systemctl", "enable", "--now", timer], "Certbot timer enable failed")
         self._command(
-            ["systemctl", "is-enabled", "--quiet", "certbot.timer"],
+            ["systemctl", "is-enabled", "--quiet", timer],
             "Certbot timer is not enabled",
         )
         self._command(
-            ["systemctl", "is-active", "--quiet", "certbot.timer"],
+            ["systemctl", "is-active", "--quiet", timer],
             "Certbot timer is not active",
         )
 
@@ -355,6 +362,7 @@ class NginxSetup:
         """Install on explicit request, configure Mavi, and verify the result."""
         base, hostnames = _hostnames(domain, panel_enabled)
         email = _email(email)
+        self._secrets = (proxy_token,) if proxy_token else ()
         authenticate_proxy = panel_enabled and bool(proxy_token)
         if authenticate_proxy and not re.fullmatch(r"[A-Za-z0-9_-]{32,128}", proxy_token):
             raise NginxSetupError("MAVI_PANEL_PROXY_TOKEN has an invalid value")
@@ -367,12 +375,21 @@ class NginxSetup:
             )
         self._check_layout()
         previous = self._snapshot()
+        dump = self._command(["nginx", "-T"], "Existing Nginx configuration is invalid")
+        collisions = foreign_hosts(dump, hostnames, (self._config, self._link))
+        if collisions:
+            detail = ", ".join(f"{host} in {filename}" for host, filename in collisions.items())
+            raise NginxSetupError(
+                f"Mavi hostnames are already configured: {detail}. "
+                "Choose another base domain or configure the existing proxy explicitly; no sites were changed."
+            )
         previous_proxy_headers = None
         if authenticate_proxy and os.path.lexists(self._proxy_headers):
             if self._is_symlink(self._proxy_headers) or not self._proxy_headers.is_file():
                 raise NginxSetupError("Refusing to replace a non-regular Mavi proxy header file")
             previous_proxy_headers = self._proxy_headers.read_bytes()
-        certbot = ["certbot", "--nginx", "--non-interactive", "--agree-tos", "--email", email, "--redirect"]
+        certbot = ["certbot", "--nginx", "--non-interactive", "--agree-tos", "--email", email,
+                   "--redirect", "--cert-name", f"mavi-{base}", "--keep-until-expiring"]
         for name in hostnames:
             certbot.extend(["-d", name])
         try:
@@ -385,12 +402,15 @@ class NginxSetup:
             self._command(["nginx", "-t"], "Certbot produced an invalid Nginx configuration")
             self._command(["systemctl", "reload", "nginx"], "Nginx reload failed")
             self._configure_timer()
-        except Exception:
-            self._rollback(previous)
-            if authenticate_proxy:
-                if previous_proxy_headers is None:
-                    self._proxy_headers.unlink(missing_ok=True)
-                else:
-                    self._atomic_write(self._proxy_headers, previous_proxy_headers, 0o600)
-            self._reload_after_rollback()
+        except Exception as original:
+            try:
+                self._rollback(previous)
+                if authenticate_proxy:
+                    if previous_proxy_headers is None:
+                        self._proxy_headers.unlink(missing_ok=True)
+                    else:
+                        self._atomic_write(self._proxy_headers, previous_proxy_headers, 0o600)
+                self._reload_after_rollback()
+            except Exception as rollback_error:
+                raise NginxSetupError(f"{original}\nRollback incomplete: {rollback_error}") from original
             raise
