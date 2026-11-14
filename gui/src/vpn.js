@@ -118,8 +118,8 @@ export async function refreshStatus() {
   try {
     const s = await invoke('vpn_status');
     applyStatus(s);
-  } catch {
-    applyStatus({ running: false, endpoint: null, service_available: false });
+  } catch (error) {
+    applyStatus({ running: false, endpoint: null, service_available: false, last_error: String(error) });
   }
 }
 
@@ -143,8 +143,8 @@ export function applyStatus(status) {
     state.disconnecting = false;
     setHero('off');
     btn.disabled = true;
-    btn.title = daemonHintText();
-    showServiceOfflineHint();
+    btn.title = daemonHintText(state.lastError);
+    showServiceOfflineHint(state.lastError);
     updateNetworkPanel();
     return;
   }
@@ -268,7 +268,8 @@ export function applyHeroForSelection() {
 export function updateNetworkPanel() {
   const conn = displayedConnection();
   setText('net-endpoint', conn?.endpoint || '—');
-  setText('net-service', state.serviceAvailable ? 'Running' : 'Offline');
+  const denied = state.lastError?.toLowerCase().includes('permission denied');
+  setText('net-service', state.serviceAvailable ? 'Running' : denied ? 'Access denied' : 'Offline');
   if (conn?.transportUnknown) {
     setText('net-protocol', '—');
     setText('net-transport', '—');

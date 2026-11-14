@@ -57,7 +57,8 @@ pub(crate) fn start_status_poller(app: AppHandle) {
                     last_error,
                     assigned_ip,
                 },
-                _ => VpnStatus::service_unavailable(),
+                Ok(IpcResponse::Error(error)) | Err(error) => VpnStatus::service_unavailable(error),
+                Ok(_) => VpnStatus::service_unavailable("Unexpected service response".into()),
             };
 
             let status_signature = format!(

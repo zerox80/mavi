@@ -66,4 +66,15 @@ describe('toast helpers', () => {
 
     expect(document.getElementById('toast').textContent).toBe('Hard failure');
   });
+
+  it('shows daemon access errors as text instead of suggesting a service restart', () => {
+    const error = "permission denied. Join the 'mavivpn' group, then log out and back in. <script>";
+    showServiceOfflineHint(error);
+
+    const toast = document.getElementById('toast');
+    expect(toast.textContent).toContain(error);
+    expect(toast.textContent).not.toContain('systemctl start');
+    expect(toast.querySelector('script')).toBeNull();
+    expect(daemonHintText(error)).toContain('permission denied');
+  });
 });

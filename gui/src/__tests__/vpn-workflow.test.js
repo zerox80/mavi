@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { state } from '../state.js';
 import {
   applyHeroForSelection,
+  applyStatus,
   connect,
   disconnect,
   refreshStatus,
@@ -10,7 +11,7 @@ import {
   wireHero,
 } from '../vpn.js';
 import { invoke } from '../api.js';
-import { showToast } from '../toast.js';
+import { showToast, showServiceOfflineHint, hideToast } from '../toast.js';
 
 vi.mock('../api.js', () => ({
   invoke: vi.fn(),
@@ -159,6 +160,22 @@ describe('vpn workflows', () => {
 
     expect(state.serviceAvailable).toBe(false);
     expect(document.getElementById('connect-btn').disabled).toBe(true);
+  });
+
+  it('preserves daemon permission errors from both status delivery paths and recovers', async () => {
+    const error = "permission denied. Your user must be in the 'mavivpn' group.";
+    applyStatus({ service_available: false, last_error: error });
+    expect(showServiceOfflineHint).toHaveBeenLastCalledWith(error);
+    expect(document.getElementById('net-service').textContent).toBe('Access denied');
+
+    invoke.mockRejectedValueOnce(error);
+    await refreshStatus();
+    expect(showServiceOfflineHint).toHaveBeenLastCalledWith(error);
+
+    applyStatus({ service_available: true, state: 'Stopped' });
+    expect(document.getElementById('net-service').textContent).toBe('Running');
+    expect(document.getElementById('connect-btn').disabled).toBe(false);
+    expect(hideToast).toHaveBeenLastCalledWith('hint');
   });
 
   it('toggleConnection cancels connecting states and routes on/off states', async () => {

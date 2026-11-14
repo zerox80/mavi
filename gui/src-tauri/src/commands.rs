@@ -262,7 +262,7 @@ pub(crate) async fn vpn_status() -> Result<VpnStatus, String> {
         }),
         Ok(IpcResponse::Error(e)) => Err(e),
         Ok(_) => Err("Unexpected response".into()),
-        Err(_) => Ok(VpnStatus::service_unavailable()),
+        Err(error) => Ok(VpnStatus::service_unavailable(error)),
     }
 }
 
@@ -291,14 +291,28 @@ pub(crate) async fn save_prefs(app: AppHandle, mut prefs: Prefs) -> Result<(), S
 }
 
 impl VpnStatus {
-    pub(crate) const fn service_unavailable() -> Self {
+    pub(crate) fn service_unavailable(error: String) -> Self {
         Self {
             running: false,
             endpoint: None,
             service_available: false,
             state: VpnState::Stopped,
-            last_error: None,
+            last_error: Some(error),
             assigned_ip: None,
         }
+    }
+}
+
+#[cfg(test)]
+mod status_tests {
+    use super::VpnStatus;
+
+    #[test]
+    fn unavailable_status_preserves_the_ipc_error_for_the_gui() {
+        let error = "permission denied: join mavivpn";
+        let status = VpnStatus::service_unavailable(error.into());
+        assert!(!status.service_available);
+        assert!(!status.running);
+        assert_eq!(status.last_error.as_deref(), Some(error));
     }
 }

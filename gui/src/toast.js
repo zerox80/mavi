@@ -24,20 +24,18 @@ export function hideToast(kind) {
   }
 }
 
-export function showServiceOfflineHint() {
+export function showServiceOfflineHint(error) {
   const box = $('toast');
   if (!box) return;
   // Don't stomp a hard error
   if (box.dataset.kind === 'error') return;
-  const isWin = navigator.platform.toLowerCase().includes('win');
   box.className = 'visible hint';
   box.dataset.kind = 'hint';
-  box.innerHTML = isWin
-    ? 'VPN daemon offline. Run in Admin PowerShell: <code>net start MaviVPNService</code>'
-    : 'VPN daemon offline. Run: <code>sudo systemctl start mavi-vpn</code>';
+  box.textContent = daemonHintText(error);
 }
 
-export function daemonHintText() {
+export function daemonHintText(error) {
+  if (error) return `Daemon unavailable: ${String(error)}`;
   return navigator.platform.toLowerCase().includes('win')
     ? 'Daemon offline. Run: net start MaviVPNService'
     : 'Daemon offline. Run: sudo systemctl start mavi-vpn';
