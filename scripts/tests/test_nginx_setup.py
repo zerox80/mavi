@@ -93,6 +93,12 @@ class RenderingTests(unittest.TestCase):
         self.assertIn("zone=mavi_panel_limit", config)
         self.assertEqual(config.count("map $http_upgrade $mavi_connection_upgrade"), 1)
 
+    def test_auth_landing_opens_the_panel_login_instead_of_master(self):
+        config = render_http_site("Example.ORG", True)
+        self.assertEqual(config.count("location = / { return 302 https://panel.example.org/auth/login; }"), 1)
+        self.assertNotIn("/admin/master", config)
+        self.assertNotIn("location = /", render_http_site("example.org", False))
+
     def test_invalid_domains_are_rejected(self):
         invalid = [
             "",

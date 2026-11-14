@@ -168,6 +168,13 @@ def _dns_check(report: PreflightReport, hostname: str, required: bool = False) -
         report.add(f"dns:{hostname}", "FAIL" if required else "WARN",
                    f"DNS does not resolve {hostname}: {exc}. Create its A/AAAA record at your DNS provider, then retry.")
         return
+    if any(ipaddress.ip_address(address).is_loopback or ipaddress.ip_address(address).is_unspecified
+           for address in addresses):
+        report.add(f"dns:{hostname}", "FAIL" if required else "WARN",
+                   f"{hostname} resolves to a loopback/unspecified address ({', '.join(addresses)}). "
+                   "Check /etc/hosts and your local DNS resolver. Inside Docker this points to the container itself "
+                   "and prevents Keycloak code exchange after sign-in/2FA. Use a reachable server address.")
+        return
     report.add(f"dns:{hostname}", "PASS", f"{hostname} resolves to {', '.join(addresses)}.")
     local = set(report.public_ipv4 + report.public_ipv6)
     if local and any(address not in local for address in addresses):

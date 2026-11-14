@@ -125,6 +125,10 @@ The installer detects installed Nginx/Certbot components and installs only missi
 
 An existing Certbot installation with the Nginx plugin, including Snap, is reused with its matching renewal timer. Mavi requests its own `mavi-<domain>` certificate and leaves other certificate lineages in place. Existing Nginx syntax and exact hostname conflicts are checked before writing the Mavi site. If another site already owns `auth.<domain>` or `panel.<domain>`, choose other names or deliberately reconfigure that site first. Failures include bounded command diagnostics, with private proxy tokens redacted; incomplete rollback is reported explicitly.
 
+In panel mode, opening `https://auth.<domain>/` starts the panel's sign-in flow in the configured Mavi realm. Global administration remains at `https://auth.<domain>/admin/master/console/`. Accounts in `mavi-vpn` sign in through the panel or the VPN client's OAuth flow; they are separate from the master administrator.
+
+The auth hostname must also resolve to a reachable server address inside the panel container. Do not override it to `127.0.0.1` in `/etc/hosts` or local DNS: Docker may inherit that answer, so the panel attempts to exchange the login code with itself and fails after password/2FA. The installer rejects loopback and unspecified DNS answers before managed HTTPS setup. You can diagnose container connectivity with `docker compose exec panel curl --fail https://auth.<domain>/realms/mavi-vpn/.well-known/openid-configuration`.
+
 Nginx terminates HTTPS publicly and forwards to the loopback HTTP ports that Keycloak (`127.0.0.1:18080`) and the panel (`127.0.0.1:18081`) publish. No `COMPOSE_PROFILES` value and no `TRAEFIK_*` variables are written in this mode. If Nginx setup fails, the `.env` file remains written and the installer reports which step to fix before rerunning.
 
 Open these firewall ports:

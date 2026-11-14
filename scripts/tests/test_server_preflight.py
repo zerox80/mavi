@@ -95,6 +95,16 @@ class NetworkChecksTests(unittest.TestCase):
                 preflight._dns_check(report, "auth.example.com", required=required)
             self.assertEqual(report.checks[0].status, status)
 
+    def test_loopback_auth_dns_is_not_accepted_as_a_working_public_hostname(self):
+        for address in ("127.0.0.1", "::1", "0.0.0.0", "::"):
+            report = PreflightReport([])
+            answers = [(socket.AF_INET, socket.SOCK_STREAM, 6, "", (address, 443))]
+            with mock.patch.object(socket, "getaddrinfo", return_value=answers):
+                preflight._dns_check(report, "auth.example.com", required=True)
+            self.assertEqual(report.checks[0].status, "FAIL")
+            self.assertIn("/etc/hosts", report.checks[0].detail)
+            self.assertIn("2FA", report.checks[0].detail)
+
     def test_dns_record_guidance_uses_public_addresses_only(self):
         report = PreflightReport([Check("dns:auth.example.com", "FAIL", "missing")], ["57.128.198.195"])
         output = io.StringIO()

@@ -98,13 +98,15 @@ def _email(value: str) -> str:
     return value
 
 
-def _proxy_block(host: str, port: int, zone: str, authenticate_proxy: bool = False) -> str:
+def _proxy_block(host: str, port: int, zone: str, authenticate_proxy: bool = False, login_url: str = "") -> str:
     proxy_headers = f"\n        include sites-available/{_PROXY_HEADERS_FILE};" if authenticate_proxy else ""
     forwarded_for = "$remote_addr" if authenticate_proxy else "$proxy_add_x_forwarded_for"
+    landing = f"\n    location = / {{ return 302 {login_url}; }}\n" if login_url else ""
     return f"""server {{
     listen 80;
     listen [::]:80;
     server_name {host};
+{landing}
 
     client_max_body_size 1m;
     client_body_buffer_size 16k;
@@ -153,7 +155,8 @@ def render_http_site(
     if panel_enabled and keycloak_port == panel_port:
         raise ValueError("Keycloak and panel ports must differ")
     zones = f"limit_req_zone $binary_remote_addr zone=mavi_auth_limit:10m rate=10r/s;"
-    blocks = [_proxy_block(hosts[0], keycloak_port, "mavi_auth_limit")]
+    login_url = f"https://panel.{domain.lower()}/auth/login" if panel_enabled else ""
+    blocks = [_proxy_block(hosts[0], keycloak_port, "mavi_auth_limit", login_url=login_url)]
     if panel_enabled:
         zones += f"\nlimit_req_zone $binary_remote_addr zone=mavi_panel_limit:10m rate=10r/s;"
         blocks.append(_proxy_block(hosts[1], panel_port, "mavi_panel_limit", authenticate_proxy))
