@@ -1,4 +1,6 @@
 #!/bin/sh
+# POSIX shell launcher for the Python server installer.
+# Run as ./install-server.sh (or sh install-server.sh), not with python3.
 set -eu
 
 ROOT=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)

@@ -67,13 +67,15 @@ use the source build instructions below.
 
 ### Guided Linux Server Setup (Recommended)
 
-Run the Python-based guided installer from a repository checkout on the Linux server:
+Run the guided installer from a repository checkout on the Linux server:
 
 ```bash
 git clone https://github.com/zerox80/mavi-vpn.git
 cd mavi-vpn
 ./install-server.sh
 ```
+
+`install-server.sh` is a small shell launcher that starts the Python installer. Run it as `./install-server.sh` or `sh install-server.sh`; do not pass it to `python3`, which fails with a `SyntaxError` because the launcher is not a Python program. If the executable bit is missing, run `chmod +x install-server.sh` first (or use `sh install-server.sh`).
 
 The recommended setup enables the web panel and Keycloak together. After confirmation, the installer sets up missing Docker packages, generates secrets, configures Nginx for `panel.<domain>` and `auth.<domain>`, obtains and renews Let's Encrypt certificates, and starts the services. The classic setup keeps the existing static-token and certificate-PIN workflow; Keycloak without the panel remains available in advanced mode. Existing installations retain their selected mode and stored secrets.
 

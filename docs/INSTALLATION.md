@@ -12,6 +12,8 @@ Use a repository checkout on a Linux server with Python 3. Run the launcher from
 ./install-server.sh
 ```
 
+`install-server.sh` is a POSIX shell launcher, not a Python script. Run it as `./install-server.sh` or `sh install-server.sh`. Running `python3 install-server.sh` fails with `SyntaxError: invalid syntax`; the launcher itself invokes `python3 -m scripts.server_installer.installer` after changing to the repository root. If the file is not executable (`Permission denied`), run `chmod +x install-server.sh` or use `sh install-server.sh`.
+
 The installer presents these choices:
 
 ```text

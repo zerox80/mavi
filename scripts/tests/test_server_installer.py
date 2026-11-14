@@ -349,6 +349,13 @@ class ComposeContractTests(unittest.TestCase):
         self.assertTrue(launcher.startswith("#!/bin/sh\n"))
         self.assertNotIn("curl", launcher)
 
+    def test_launcher_is_executable(self):
+        launcher = ROOT / "install-server.sh"
+        self.assertTrue(launcher.stat().st_mode & 0o111,
+                        "install-server.sh must be committed with the executable bit (git mode 100755)")
+        text = launcher.read_text(encoding="utf-8")
+        self.assertIn("python3 -m scripts.server_installer.installer", text)
+
 
 class KeycloakBootstrapTests(unittest.TestCase):
     def api(self):
