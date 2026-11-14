@@ -12,6 +12,17 @@ permissions:
   contents: read
 
 jobs:
+  keycloak-import:
+    name: Keycloak realm import
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Import the shipped realm with the deployed Keycloak version
+        run: |
+          docker run --rm --memory=1g -e KC_DB=dev-file \
+            -v "$PWD/backend/keycloak/mavi-vpn-realm.json:/tmp/mavi-realm.json:ro" \
+            quay.io/keycloak/keycloak:24.0.1 import --file /tmp/mavi-realm.json
   test:
     name: Unit Tests
     runs-on: ubuntu-latest

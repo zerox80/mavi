@@ -113,6 +113,5 @@
   "actionTokenGeneratedByAdminLifespan": 43200,
   "revokeRefreshToken": false,
   "refreshTokenMaxReuse": 0,
-  "accessTokenSignatureAlgorithm": "RS256",
-  "idTokenSignatureAlgorithm": "RS256"
+  "defaultSignatureAlgorithm": "RS256"
 }
