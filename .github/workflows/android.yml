@@ -10,7 +10,8 @@ permissions:
 
 concurrency:
   group: android-apk-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
+  # Finish the current APK; newer pushes keep the latest pending build queued.
+  cancel-in-progress: false
 
 jobs:
   android-apk:

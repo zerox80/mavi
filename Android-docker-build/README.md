@@ -70,6 +70,12 @@ Nach einem erfolgreichen Lauf gibt es zwei herunterladbare Artefakte:
 `android-apk` mit der APK fuer alle vier Architekturen und
 `android-build-lockfile` mit den beim Build verwendeten Fork-Revisionen.
 
+Security-Audits laufen in einem separaten Workflow und blockieren den APK-Build
+nicht. Neue Pushes brechen einen laufenden APK-Build ebenfalls nicht ab; der
+neueste wartende Build startet danach. Bei der APK-Auswahl deshalb den Branch
+und Commit des abgeschlossenen Runs pruefen: Ein PR-Design ist erst nach dem
+Merge in einer `main`-APK enthalten.
+
 ### Lokale Dateien
 
 - Debug-APK: `Android-docker-build/output/apk/debug/app-debug.apk`
