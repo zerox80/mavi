@@ -40,7 +40,7 @@ class DockerContextTests(unittest.TestCase):
                         members = re.search(r'members\s*=\s*\[(.*?)\]', (ROOT / "Cargo.toml").read_text(), re.S)
                         included += [f"{member}/Cargo.toml" for member in re.findall(r'"([^"]+)"', members.group(1))]
                         included += ["panel/src/main.rs", "panel/web/index.html"]
-                    if context == "server":
+                    if context != "backend":
                         included.append("LICENSE")
                     for name in excluded + included:
                         path = source / name

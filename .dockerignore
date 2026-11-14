@@ -2,6 +2,7 @@
 **
 !Cargo.toml
 !Cargo.lock
+!LICENSE
 !backend/
 !backend/Cargo.toml
 !backend/src/

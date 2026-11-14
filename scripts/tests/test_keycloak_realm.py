@@ -11,6 +11,8 @@ class KeycloakRealmTests(unittest.TestCase):
         self.assertEqual(realm["defaultSignatureAlgorithm"], "RS256")
         self.assertNotIn("accessTokenSignatureAlgorithm", realm)
         self.assertNotIn("idTokenSignatureAlgorithm", realm)
+        # An explicit empty list suppresses Keycloak's built-in roles/profile/email scopes.
+        self.assertNotIn("clientScopes", realm)
         self.assertEqual(realm["realm"], "mavi-vpn")
         self.assertEqual(realm["users"], [])
 

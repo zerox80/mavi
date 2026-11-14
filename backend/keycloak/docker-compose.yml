@@ -19,6 +19,12 @@ services:
       POSTGRES_DB: keycloak
       POSTGRES_USER: keycloak
       POSTGRES_PASSWORD: ${KEYCLOAK_DB_PASSWORD:?KEYCLOAK_DB_PASSWORD is required}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready --username=keycloak --dbname=keycloak --quiet"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 10s
 
   keycloak:
     image: quay.io/keycloak/keycloak:24.0.1
@@ -38,7 +44,7 @@ services:
       KEYCLOAK_ADMIN: ${KEYCLOAK_ADMIN_USER:-admin}
       KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASS:?KEYCLOAK_ADMIN_PASS is required}
       KC_HOSTNAME: auth.${DOMAIN_NAME:?DOMAIN_NAME is required for Keycloak}
-      KC_PROXY: edge
+      KC_HTTP_ENABLED: "true"
       KC_PROXY_HEADERS: xforwarded
     volumes:
       # Realm import: read-only mount. Keycloak reads it on startup when
@@ -53,7 +59,8 @@ services:
     ports:
       - "127.0.0.1:18080:8080"
     depends_on:
-      - keycloak-db
+      keycloak-db:
+        condition: service_healthy
     # Traefik configuration (automatically applied if Traefik is running)
     labels:
       - "traefik.enable=true"
