@@ -109,7 +109,11 @@ The selected Compose files are stored in `.env`:
 | Keycloak only | `docker-compose.yml:keycloak/docker-compose.yml` |
 | Web panel | `docker-compose.yml:keycloak/docker-compose.yml:panel/docker-compose.yml` |
 
-Panel mode also sets `MAVI_WEB_PANEL_ENABLED=true`, forces `VPN_KEYCLOAK_ENABLED=true`, and defaults `VPN_KEYCLOAK_REQUIRED_ROLE` to `vpn-user`. `MAVI_PANEL_VPN_ENDPOINT` is written explicitly because nested Compose interpolation is not portable. Keycloak and the panel always publish loopback-only HTTP ports (`127.0.0.1:18080` and `127.0.0.1:18081`) for the reverse proxy.
+Panel mode also sets `MAVI_WEB_PANEL_ENABLED=true`, forces `VPN_KEYCLOAK_ENABLED=true`, and defaults `VPN_KEYCLOAK_REQUIRED_ROLE` to `vpn-user`. Keycloak and the panel always publish loopback-only HTTP ports (`127.0.0.1:18080` and `127.0.0.1:18081`) for the reverse proxy.
+
+The panel derives enrollment profiles from `VPN_PUBLIC_HOST` (default: `DOMAIN_NAME`) and the current VPN listener port. Change `VPN_PORT` to change the default UDP listener and the generated profile port together. An explicitly configured `VPN_BIND_ADDR` takes precedence over `VPN_PORT`; HTTP/2 profiles use `VPN_HTTP2_BIND_ADDR`. A nonempty `MAVI_PANEL_VPN_ENDPOINT` is a deliberate fixed override for external port mappings. Older installers wrote this override automatically: remove that line to enable automatic endpoints after updating the panel image and Compose files. Also remove a redundant `VPN_BIND_ADDR` if you want `VPN_PORT` alone to control the UDP listener.
+
+Apply `.env` edits with `docker compose --env-file .env up -d --no-build` from `backend/`, using the saved Compose files. A plain `docker compose restart` does not reload container environment variables. Generate or re-import a profile after changing ports; an already imported client profile keeps its previous settings.
 
 ### Reverse proxy modes
 

@@ -11,7 +11,7 @@ import unittest
 from unittest import mock
 
 from scripts.server_installer import images, installer
-from scripts.server_installer.config import CLASSIC, PANEL, KEYCLOAK, InstallPlan, ConfigurationError, build_configuration, plan_from_existing
+from scripts.server_installer.config import CLASSIC, PANEL, KEYCLOAK, InstallPlan, ConfigurationError, build_configuration, plan_from_existing, save_env
 
 ROOT = Path(__file__).resolve().parents[2]
 
@@ -93,6 +93,28 @@ class PrebuiltImagesTests(unittest.TestCase):
             env = images.compose_environment({"COMPOSE_FILE": "docker-compose.yml", "DOMAIN_NAME": "example.com"})
         self.assertEqual(env["DOMAIN_NAME"], "example.com")
         self.assertEqual(env["COMPOSE_FILE"], "docker-compose.yml")
+
+    @unittest.skipUnless(os.environ.get("COMPOSE_TEST_BINARY"), "Set COMPOSE_TEST_BINARY for real Compose rendering")
+    def test_saved_env_port_edit_reaches_both_vpn_and_panel(self):
+        _, values = self.values()
+        self.assertNotIn("MAVI_PANEL_VPN_ENDPOINT", values)
+        self.assertNotIn("VPN_BIND_ADDR", values)
+        with tempfile.TemporaryDirectory() as directory:
+            env_file = Path(directory) / ".env"
+            environment = {key: value for key, value in os.environ.items() if key not in values}
+            for port in ("10443", "443"):
+                values["VPN_PORT"] = port
+                save_env(env_file, values)
+                command = images.compose_command(ROOT / "backend", values, "config", "--format", "json", env_file=env_file)
+                result = subprocess.run([os.environ["COMPOSE_TEST_BINARY"], *command[2:]],
+                                        capture_output=True, text=True, env=environment)
+                self.assertEqual(result.returncode, 0, result.stderr)
+                services = json.loads(result.stdout)["services"]
+                self.assertEqual(services["vpn-server"]["environment"]["VPN_BIND_ADDR"], f"0.0.0.0:{port}")
+                panel = services["panel"]["environment"]
+                self.assertEqual(panel["VPN_PORT"], port)
+                self.assertFalse(panel["MAVI_PANEL_VPN_ENDPOINT"])
+                self.assertEqual(panel["VPN_PUBLIC_HOST"], "example.com")
 
     @unittest.skipUnless(os.environ.get("COMPOSE_TEST_BINARY"), "Set COMPOSE_TEST_BINARY for real Compose rendering")
     def test_all_modes_render_with_images_and_source_builds_only_when_requested(self):

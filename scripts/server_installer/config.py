@@ -167,6 +167,19 @@ def _secret(values: dict[str, str], key: str, factory: Callable[[str], str], gen
         generated.add(key)
 
 
+def panel_vpn_endpoint(values: Mapping[str, str]) -> str:
+    """Preview the same automatic endpoint that the panel resolves at startup."""
+    if values.get("MAVI_PANEL_VPN_ENDPOINT"):
+        return values["MAVI_PANEL_VPN_ENDPOINT"]
+    host = values.get("VPN_PUBLIC_HOST") or values.get("DOMAIN_NAME", "")
+    if ":" in host and not host.startswith("["):
+        host = f"[{host}]"
+    key = "VPN_HTTP2_BIND_ADDR" if values.get("MAVI_PANEL_TRANSPORT") == "http2" else "VPN_BIND_ADDR"
+    bind = values.get(key, "")
+    port = bind.rsplit(":", 1)[-1] if bind else values.get("VPN_PORT", "10443")
+    return f"{host}:{port}"
+
+
 def build_configuration(
     plan: InstallPlan,
     existing: Mapping[str, str] | None = None,
@@ -194,7 +207,6 @@ def build_configuration(
         {
             "RUST_LOG": values.get("RUST_LOG", "info"),
             "VPN_PORT": values.get("VPN_PORT", "10443"),
-            "VPN_BIND_ADDR": values.get("VPN_BIND_ADDR", f"0.0.0.0:{values.get('VPN_PORT', '10443')}"),
             "VPN_MTU": "1280",
             "VPN_NETWORK": values.get("VPN_NETWORK", "10.8.0.0/24"),
             "VPN_NETWORK_V6": values.get("VPN_NETWORK_V6", "fd00::/64"),
@@ -232,13 +244,9 @@ def build_configuration(
     if plan.uses_panel:
         _secret(values, "MAVI_PANEL_DB_PASSWORD", secret_factory, generated)
         _secret(values, "MAVI_PANEL_PROXY_TOKEN", secret_factory, generated)
-        public_host = values.get("VPN_PUBLIC_HOST") or domain
         http2_bind = values.get("VPN_HTTP2_BIND_ADDR")
         quic_transport = "http3_censorship_resistant" if parse_bool(values.get("VPN_CENSORSHIP_RESISTANT")) else "quic"
         transport = values.get("MAVI_PANEL_TRANSPORT") or ("http2" if http2_bind else quic_transport)
-        bind = http2_bind if transport == "http2" else values["VPN_BIND_ADDR"]
-        port = bind.rsplit(":", 1)[-1] if bind else values["VPN_PORT"]
-        values["MAVI_PANEL_VPN_ENDPOINT"] = values.get("MAVI_PANEL_VPN_ENDPOINT") or f"{public_host}:{port}"
         values["MAVI_PANEL_TRANSPORT"] = transport
 
     if not plan.existing or plan.reconfigure:

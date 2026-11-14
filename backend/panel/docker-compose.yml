@@ -48,7 +48,13 @@ services:
       MAVI_PANEL_CLIENT_SECRET: ${MAVI_PANEL_CLIENT_SECRET:-}
       MAVI_PANEL_VPN_CLIENT_ID: ${VPN_KEYCLOAK_CLIENT_ID:-mavi-client}
       MAVI_PANEL_PROXY_TOKEN: ${MAVI_PANEL_PROXY_TOKEN:-}
-      MAVI_PANEL_VPN_ENDPOINT: ${MAVI_PANEL_VPN_ENDPOINT}
+      # Optional override for an external public port mapping. By default the
+      # panel derives profiles from the VPN listener settings below.
+      MAVI_PANEL_VPN_ENDPOINT: ${MAVI_PANEL_VPN_ENDPOINT:-}
+      VPN_PUBLIC_HOST: ${VPN_PUBLIC_HOST:-${DOMAIN_NAME}}
+      VPN_PORT: ${VPN_PORT:-10443}
+      VPN_BIND_ADDR: ${VPN_BIND_ADDR:-}
+      VPN_HTTP2_BIND_ADDR: ${VPN_HTTP2_BIND_ADDR:-}
       MAVI_PANEL_CERT_PIN_FILE: /server-data/cert_pin.txt
       MAVI_PANEL_ECH_CONFIG_FILE: /server-data/ech_config_hex.txt
       MAVI_PANEL_TRANSPORT: ${MAVI_PANEL_TRANSPORT:-http3_censorship_resistant}

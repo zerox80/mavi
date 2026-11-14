@@ -8,6 +8,8 @@ use url::Url;
 
 const MAX_SERVER_FILE_BYTES: usize = 16 * 1024;
 
+mod endpoint;
+
 #[derive(Debug, thiserror::Error)]
 #[error("{0}")]
 pub struct ConfigError(String);
@@ -140,7 +142,6 @@ impl Config {
             ));
         }
         let public_url = required("MAVI_PANEL_PUBLIC_URL", &mut lookup)?;
-        let vpn_endpoint = required("MAVI_PANEL_VPN_ENDPOINT", &mut lookup)?;
         let insecure_http = parse_bool(
             lookup("MAVI_PANEL_INSECURE_HTTP")
                 .as_deref()
@@ -162,6 +163,7 @@ impl Config {
             .as_deref()
             .unwrap_or("http3_censorship_resistant")
             .parse()?;
+        let vpn_endpoint = endpoint::resolve(transport, &mut lookup)?;
         let bind = lookup("MAVI_PANEL_BIND")
             .as_deref()
             .unwrap_or("0.0.0.0:8081")

@@ -11,11 +11,18 @@ import unittest
 from unittest import mock
 
 from scripts.server_installer import installer, preflight, readiness
-from scripts.server_installer.config import InstallPlan, PANEL, PROXY_NGINX
+from scripts.server_installer.config import CLASSIC, InstallPlan, PANEL, PROXY_NGINX
 from scripts.server_installer.preflight import Check, PreflightReport
 
 
 class NetworkChecksTests(unittest.TestCase):
+    def test_udp_check_uses_actual_bind_port_instead_of_stale_default(self):
+        report = PreflightReport([])
+        with mock.patch.object(preflight, "_port_check") as check:
+            preflight._network_checks(report, InstallPlan(CLASSIC),
+                                      {"VPN_PORT": "10443", "VPN_BIND_ADDR": "0.0.0.0:443"}, mock.Mock())
+        self.assertEqual(check.call_args.args[1:3], (443, "udp"))
+
     def port(self, error, owner="nginx", host_nginx=True, valid=True, **options):
         report = PreflightReport([])
         def runner(args, **kwargs):

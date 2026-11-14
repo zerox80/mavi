@@ -25,6 +25,7 @@ from scripts.server_installer.config import (
     load_env,
     mode_from_environment,
     parse_env,
+    panel_vpn_endpoint,
     plan_from_existing,
     save_env,
     update_env_text,
@@ -119,7 +120,8 @@ class ModeTests(unittest.TestCase):
                 }
                 values, _ = build_configuration(panel_plan(), existing, secret_factory)
                 self.assertEqual(values["MAVI_PANEL_TRANSPORT"], expected)
-                self.assertEqual(values["MAVI_PANEL_VPN_ENDPOINT"], f"vpn.example.net:{port}")
+                self.assertEqual(panel_vpn_endpoint(values), f"vpn.example.net:{port}")
+                self.assertNotIn("MAVI_PANEL_VPN_ENDPOINT", values)
 
     def test_panel_preserves_explicit_public_endpoint(self):
         existing = {
@@ -216,7 +218,7 @@ class ComposeContractTests(unittest.TestCase):
             "MAVI_PANEL_KEYCLOAK_URL: ${VPN_KEYCLOAK_URL}",
             "MAVI_PANEL_CLIENT_ID: mavi-panel",
             "MAVI_PANEL_CLIENT_SECRET: ${MAVI_PANEL_CLIENT_SECRET:-}",
-            "MAVI_PANEL_VPN_ENDPOINT: ${MAVI_PANEL_VPN_ENDPOINT}",
+            "MAVI_PANEL_VPN_ENDPOINT: ${MAVI_PANEL_VPN_ENDPOINT:-}",
             "MAVI_PANEL_CERT_PIN_FILE: /server-data/cert_pin.txt",
             "MAVI_PANEL_ECH_CONFIG_FILE: /server-data/ech_config_hex.txt",
             "MAVI_PANEL_BIND: 0.0.0.0:8081",

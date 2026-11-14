@@ -288,11 +288,12 @@ def _port_check(report: PreflightReport, port: int, protocol: str, required: boo
 def _network_checks(report: PreflightReport, plan: InstallPlan, values: dict[str, str], runner: Runner,
                     network_required: bool = True, backend: Path | None = None) -> None:
     try:
-        vpn_port = int(values.get("VPN_PORT", "10443"))
+        bind = values.get("VPN_BIND_ADDR", "")
+        vpn_port = int(bind.rsplit(":", 1)[-1] if bind else values.get("VPN_PORT", "10443"))
         if not 1 <= vpn_port <= 65535:
             raise ValueError
     except ValueError:
-        report.add("port:vpn", "FAIL", "VPN_PORT must be an integer between 1 and 65535.")
+        report.add("port:vpn", "FAIL", "VPN_PORT / VPN_BIND_ADDR must specify a port between 1 and 65535.")
         return
     _port_check(report, vpn_port, "udp", required=False, runner=runner)
     if plan.uses_keycloak:

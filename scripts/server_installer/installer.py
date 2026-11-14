@@ -26,6 +26,7 @@ try:
         build_configuration,
         load_env,
         mode_from_environment,
+        panel_vpn_endpoint,
         plan_from_existing,
         save_env,
         validate_domain,
@@ -52,6 +53,7 @@ except ImportError:  # Direct execution from the repository checkout.
         build_configuration,
         load_env,
         mode_from_environment,
+        panel_vpn_endpoint,
         plan_from_existing,
         save_env,
         validate_domain,
@@ -222,7 +224,7 @@ def print_summary(plan: InstallPlan, values: Mapping[str, str], env_path: Path, 
         print(f"  Proxy mode:    {PROXY_LABELS[plan.proxy]}")
     if plan.uses_panel:
         print(f"  Panel URL:     https://panel.{values['DOMAIN_NAME']}")
-        print(f"  VPN endpoint:  {values['MAVI_PANEL_VPN_ENDPOINT']}")
+        print(f"  VPN endpoint:  {panel_vpn_endpoint(values)}")
         print(f"  Initial admin: {'yes' if plan.create_admin else 'no'}")
     if plan.reconfigure:
         print("  Reconfigure:   setup answers and derived URLs; existing credentials and data are retained")

@@ -11,7 +11,7 @@ from scripts.server_installer import installer
 from scripts.server_installer.config import (
     CLASSIC, KEYCLOAK, PANEL, PROXY_EXTERNAL, PROXY_NGINX, PROXY_TRAEFIK,
     RECONFIGURE_KEYS, ConfigurationError, InstallPlan, build_configuration,
-    load_env, save_env,
+    load_env, save_env, panel_vpn_endpoint,
 )
 from scripts.server_installer.preflight import PreflightReport
 
@@ -129,7 +129,8 @@ class ReconfigurationTests(unittest.TestCase):
         values = self.configuration(InstallPlan(PANEL, "new.example.com", "admin@new.example.com", PROXY_NGINX, reconfigure=True))
         self.assertEqual(values["DOMAIN_NAME"], "new.example.com")
         self.assertEqual(values["VPN_KEYCLOAK_URL"], "https://auth.new.example.com")
-        self.assertEqual(values["MAVI_PANEL_VPN_ENDPOINT"], "new.example.com:11443")
+        self.assertEqual(panel_vpn_endpoint(values), "new.example.com:11443")
+        self.assertNotIn("MAVI_PANEL_VPN_ENDPOINT", values)
         self.assertEqual(values["MAVI_PANEL_TRANSPORT"], "http3_censorship_resistant")
         self.assertEqual(values["COMPOSE_PROFILES"], "")
         self.assertEqual(values["VPN_KEYCLOAK_REALM"], "keep-realm")

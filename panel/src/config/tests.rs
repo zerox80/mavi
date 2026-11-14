@@ -112,6 +112,81 @@ fn generated_profile_uses_the_shared_schema_and_mtu() {
     assert!(profile.ech_config.is_none());
 }
 
+fn automatic_values() -> HashMap<&'static str, String> {
+    let mut configured = values();
+    configured.remove("MAVI_PANEL_VPN_ENDPOINT");
+    configured.insert("DOMAIN_NAME", "vpn.example".into());
+    configured.insert("VPN_PORT", "443".into());
+    configured
+}
+
+#[test]
+fn automatic_profile_follows_a_changed_udp_port() {
+    let config = load(automatic_values()).unwrap();
+    let profile = config
+        .profile_from_files(
+            "0b858e3f-a9c5-4ae5-a859-b556e6ba70c0".into(),
+            "Android".into(),
+            "cd".repeat(32),
+            None,
+        )
+        .unwrap();
+    assert_eq!(profile.endpoint, "vpn.example:443");
+    profile.validate().unwrap();
+}
+
+#[test]
+fn automatic_endpoint_uses_the_actual_listener_and_public_hostname() {
+    let mut configured = automatic_values();
+    configured.insert("VPN_BIND_ADDR", "[::]:11443".into());
+    configured.insert("VPN_PUBLIC_HOST", "edge.example".into());
+    assert_eq!(load(configured).unwrap().vpn_endpoint, "edge.example:11443");
+}
+
+#[test]
+fn automatic_http2_profile_uses_the_tcp_listener() {
+    let mut configured = automatic_values();
+    configured.insert("MAVI_PANEL_TRANSPORT", "http2".into());
+    configured.insert("VPN_BIND_ADDR", "0.0.0.0:443".into());
+    configured.insert("VPN_HTTP2_BIND_ADDR", "0.0.0.0:8443".into());
+    assert_eq!(load(configured).unwrap().vpn_endpoint, "vpn.example:8443");
+}
+
+#[test]
+fn explicit_public_port_mapping_remains_authoritative() {
+    let mut configured = automatic_values();
+    configured.insert("VPN_BIND_ADDR", "0.0.0.0:11443".into());
+    configured.insert("MAVI_PANEL_VPN_ENDPOINT", "edge.example:443".into());
+    assert_eq!(load(configured).unwrap().vpn_endpoint, "edge.example:443");
+}
+
+#[test]
+fn automatic_endpoint_brackets_ipv6_public_hosts() {
+    for host in ["2001:db8::1", "[2001:db8::1]"] {
+        let mut configured = automatic_values();
+        configured.insert("VPN_PUBLIC_HOST", host.into());
+        assert_eq!(load(configured).unwrap().vpn_endpoint, "[2001:db8::1]:443");
+    }
+}
+
+#[test]
+fn automatic_endpoints_reject_unusable_listener_configuration() {
+    for port in ["0", "65536", "bad"] {
+        let mut configured = automatic_values();
+        configured.insert("VPN_PORT", port.into());
+        assert!(load(configured).is_err());
+    }
+    let mut no_host = automatic_values();
+    no_host.remove("DOMAIN_NAME");
+    assert!(load(no_host).is_err());
+    let mut no_tcp = automatic_values();
+    no_tcp.insert("MAVI_PANEL_TRANSPORT", "http2".into());
+    assert!(load(no_tcp).is_err());
+    let mut invalid_bind = automatic_values();
+    invalid_bind.insert("VPN_BIND_ADDR", "not-a-socket".into());
+    assert!(load(invalid_bind).is_err());
+}
+
 #[test]
 fn enrollment_uses_the_configured_vpn_client_id() {
     let mut configured = values();
