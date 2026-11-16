@@ -20,7 +20,7 @@
     "eslint-config-prettier": "^9.1.0",
     "eslint-plugin-prettier": "^5.5.7",
     "globals": "^17.14.0",
-    "jsdom": "^30",
+    "jsdom": "^31",
     "prettier": "^3.9.10",
     "vite": "^8.3.7",
     "vitest": "^5.0.5"
