@@ -13,9 +13,10 @@ members = [
 [workspace.package]
 version = "1.3.0"
 # Minimum supported Rust version for the whole workspace. Bounded by the
-# locked dependency set (constant_time_eq requires 1.95); bump it here
-# when a dependency raises the floor so older toolchains fail with a clear
-# "package requires rustc X" error instead of an opaque build failure.
+# locked dependency set (currently parking_lot 0.13 requires 1.95). CI builds
+# on stable, so scripts/check_toolchain_versions.py fails the security job
+# when a dependency raises the floor above this value or when README.md and
+# AGENTS.md quote a different version. Bump it here, then fix the docs.
 rust-version = "1.95"
 
 [workspace.lints.rust]

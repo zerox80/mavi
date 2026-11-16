@@ -13,7 +13,7 @@ Mavi VPN is a Rust workspace with QUIC, HTTP/3, and HTTP/2 transports.
 
 ## Build, Test, and Development Commands
 
-Use Rust 1.95+; GUI CI uses Node.js 24. Run Cargo commands from the repository root.
+Use Rust 1.95+; GUI CI uses Node.js 24 (single source: `.node-version`). Run Cargo commands from the repository root.
 
 - `cargo build --release -p windows-vpn`: build Windows CLI/service; use `-p linux-vpn` on Linux.
 - `cargo test-core-workspace`: shared, Android Rust, backend, and probe tests (Linux CI).

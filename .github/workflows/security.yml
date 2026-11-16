@@ -22,7 +22,7 @@ jobs:
       - name: Install Node.js
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
-          node-version: 24.15.0
+          node-version-file: .node-version
           cache: npm
           cache-dependency-path: gui/package-lock.json
       - name: Install locked dependencies
@@ -57,6 +57,8 @@ jobs:
         run: python3 scripts/check_fork_sources.py --check-remote
       - name: Validate synchronized RustSec exceptions
         run: python3 scripts/check_security_exceptions.py
+      - name: Validate toolchain versions against locked dependencies
+        run: python3 scripts/check_toolchain_versions.py
       - name: Install cargo-deny
         uses: taiki-e/install-action@1bc50175d5a5b2af5d7bc40ba011f153ec39715a # cargo-deny
       - name: Run cargo-deny
