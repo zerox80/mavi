@@ -5,6 +5,13 @@ updates:
     directory: "/"
     schedule:
       interval: "weekly"
+    groups:
+      all:
+        patterns:
+          - "*"
+        update-types:
+          - "minor"
+          - "patch"
 
   # Maintain dependencies for Cargo Workspace
   - package-ecosystem: "cargo"
@@ -20,39 +27,37 @@ updates:
           - "minor"
           - "patch"
 
-  # Maintain Dockerfile at root
+  # Maintain every Dockerfile. One group keeps the Rust toolchain image in
+  # sync across all of them instead of opening one PR per directory.
   - package-ecosystem: "docker"
-    directory: "/"
+    directories:
+      - "/"
+      - "/backend"
+      - "/panel"
+      - "/docker/server"
     schedule:
       interval: "weekly"
     open-pull-requests-limit: 5
+    groups:
+      rust-toolchain:
+        patterns:
+          - "rust"
 
-  # Maintain Dockerfile at backend/
-  - package-ecosystem: "docker"
-    directory: "/backend"
+  # Maintain third-party images referenced from docker-compose files
+  # (Keycloak, Postgres, Traefik). Postgres major upgrades need a data
+  # migration, so they are never proposed automatically.
+  - package-ecosystem: "docker-compose"
+    directories:
+      - "/backend"
+      - "/backend/keycloak"
+      - "/backend/panel"
     schedule:
       interval: "weekly"
     open-pull-requests-limit: 5
-
-  # Maintain Keycloak docker-compose at backend/keycloak/
-  - package-ecosystem: "docker"
-    directory: "/backend/keycloak"
-    schedule:
-      interval: "weekly"
-    open-pull-requests-limit: 5
-
-  # Maintain the published server image and Android build toolchain.
-  - package-ecosystem: "docker"
-    directory: "/docker/server"
-    schedule:
-      interval: "weekly"
-    open-pull-requests-limit: 5
-
-  - package-ecosystem: "docker"
-    directory: "/Android-docker-build"
-    schedule:
-      interval: "weekly"
-    open-pull-requests-limit: 5
+    ignore:
+      - dependency-name: "postgres"
+        update-types:
+          - "version-update:semver-major"
 
   # Maintain Android dependencies
   - package-ecosystem: "gradle"
