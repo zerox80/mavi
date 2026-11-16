@@ -225,6 +225,6 @@ dependencies {
     implementation("com.squareup.okhttp3:okhttp:5.5.1") // For token exchange
 
     testImplementation("junit:junit:4.13.2")
-    testImplementation("org.robolectric:robolectric:4.17")
+    testImplementation("org.robolectric:robolectric:4.18")
     testImplementation("org.json:json:20260814")
 }
