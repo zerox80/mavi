@@ -19,10 +19,17 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Import the shipped realm with the deployed Keycloak version
+        env:
+          DOMAIN_NAME: example.test
+          VPN_KEYCLOAK_URL: https://auth.example.test
+          KEYCLOAK_DB_PASSWORD: ci-placeholder
+          KEYCLOAK_ADMIN_PASS: ci-placeholder
         run: |
-          docker run --rm --memory=1g -e KC_DB=dev-file \
+          image=$(docker compose -f backend/keycloak/docker-compose.yml \
+            config --no-consistency --format json | jq -er '.services.keycloak.image')
+          docker run --rm --memory=2g -e KC_DB=dev-file \
             -v "$PWD/backend/keycloak/mavi-vpn-realm.json:/tmp/mavi-realm.json:ro" \
-            quay.io/keycloak/keycloak:24.0.1 import --file /tmp/mavi-realm.json
+            "$image" import --file /tmp/mavi-realm.json
   test:
     name: Unit Tests
     runs-on: ubuntu-latest
