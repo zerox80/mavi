@@ -2,7 +2,7 @@
 # Build with the repository root context: docker build -f panel/Dockerfile .
 
 # Builder Stage
-FROM rust:1.98-slim AS builder
+FROM rust:1.100-slim AS builder
 WORKDIR /app
 
 # Install git for Cargo to fetch git dependencies
