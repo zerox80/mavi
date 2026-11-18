@@ -48,7 +48,7 @@ services:
 
   # Traefik Reverse Proxy
   traefik:
-    image: traefik:v2.11
+    image: traefik:v3.6
     profiles: ["traefik"] # OPTIONAL: Only starts if --profile traefik is used
     container_name: traefik
     command:
