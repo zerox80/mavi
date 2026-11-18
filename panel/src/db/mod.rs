@@ -66,7 +66,7 @@ pub async fn connect(database_url: &str) -> Result<PgPool, sqlx::Error> {
 
 pub async fn migrate(pool: &PgPool) -> Result<(), sqlx::Error> {
     let mut transaction = pool.begin().await?;
-    for statement in MIGRATIONS {
+    for &statement in MIGRATIONS {
         sqlx::query(statement).execute(&mut *transaction).await?;
     }
     transaction.commit().await

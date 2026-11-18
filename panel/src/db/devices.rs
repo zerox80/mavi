@@ -23,12 +23,16 @@ pub async fn list_devices(
     administrator: bool,
 ) -> Result<Vec<Device>, sqlx::Error> {
     let rows = if administrator {
-        sqlx::query(device_select("ORDER BY created_at DESC LIMIT 500").as_str())
-            .fetch_all(pool)
-            .await?
+        sqlx::query(
+            "SELECT id, owner_username, label, platform, status, created_at, imported_at
+             FROM panel_devices ORDER BY created_at DESC LIMIT 500",
+        )
+        .fetch_all(pool)
+        .await?
     } else {
         sqlx::query(
-            device_select("WHERE owner_subject = $1 ORDER BY created_at DESC LIMIT 500").as_str(),
+            "SELECT id, owner_username, label, platform, status, created_at, imported_at
+             FROM panel_devices WHERE owner_subject = $1 ORDER BY created_at DESC LIMIT 500",
         )
         .bind(subject)
         .fetch_all(pool)
@@ -110,13 +114,6 @@ pub async fn delete_device(
     .await?;
     transaction.commit().await?;
     Ok(true)
-}
-
-fn device_select(suffix: &str) -> String {
-    format!(
-        "SELECT id, owner_username, label, platform, status, created_at, imported_at
-         FROM panel_devices {suffix}"
-    )
 }
 
 fn device_from_row(row: sqlx::postgres::PgRow) -> Result<Device, sqlx::Error> {
