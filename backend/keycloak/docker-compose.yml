@@ -10,11 +10,16 @@ services:
       VPN_KEYCLOAK_REQUIRED_SCOPE: ${VPN_KEYCLOAK_REQUIRED_SCOPE:-}
 
   keycloak-db:
-    image: postgres:15
+    # Keycloak 26.8 supports PostgreSQL up to 18. Pin minor and Debian release:
+    # a new glibc can change collation order and invalidate text indexes.
+    # 18+ images keep data in /var/lib/postgresql/<major>/docker; after a major
+    # bump, run: sudo python3 -m scripts.server_installer.postgres_upgrade
+    # (./install-server.sh does this automatically).
+    image: postgres:18.7-trixie
     container_name: keycloak-db
     restart: unless-stopped
     volumes:
-      - ./data/postgres:/var/lib/postgresql/data
+      - ./data/postgres:/var/lib/postgresql
     environment:
       POSTGRES_DB: keycloak
       POSTGRES_USER: keycloak

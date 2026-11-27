@@ -39,6 +39,7 @@ try:
     from .readiness import explain_network, network_action, network_failures
     from .images import compose_command, compose_environment, prepare_images, stack_services
     from .keycloak_diagnostics import check_startup
+    from .postgres_upgrade import apply_upgrades, pending_upgrades
 except ImportError:  # Direct execution from the repository checkout.
     from config import (
         CLASSIC,
@@ -66,6 +67,7 @@ except ImportError:  # Direct execution from the repository checkout.
     from readiness import explain_network, network_action, network_failures
     from images import compose_command, compose_environment, prepare_images, stack_services
     from keycloak_diagnostics import check_startup
+    from postgres_upgrade import apply_upgrades, pending_upgrades
 
 MODE_LABELS = {PANEL: "Web panel + Keycloak", KEYCLOAK: "Keycloak only", CLASSIC: "Classic token setup"}
 PROXY_LABELS = {
@@ -316,6 +318,22 @@ def prepare_private_paths(backend: Path, standalone: bool) -> None:
         os.chmod(acme, 0o600)
 
 
+def upgrade_databases(backend: Path, values: dict[str, str], non_interactive: bool) -> bool:
+    """Move existing PostgreSQL data to the Compose image's major version before starting it."""
+    upgrades = pending_upgrades(backend, values)
+    if not upgrades:
+        return True
+    print("\nExisting PostgreSQL data must be upgraded for the configured database images:")
+    for upgrade in upgrades:
+        print(f"  {upgrade.describe()}")
+    print("The affected services stop meanwhile. Dumps and the old cluster are kept for rollback.")
+    if not non_interactive and not confirm("Upgrade the PostgreSQL data now?", True):
+        print("Setup stopped before starting containers. Rerun the installer to upgrade later.")
+        return False
+    apply_upgrades(backend, values, upgrades)
+    return True
+
+
 def start_stack(backend: Path, plan: InstallPlan, values: dict[str, str]) -> int:
     flags = ["--build"] if plan.build_from_source else ["--no-build", "--pull", "never"]
     run(compose_command(backend, values, "up", "-d", *flags, *stack_services(plan, values, include_panel=False)),
@@ -439,6 +457,8 @@ def main(argv: list[str] | None = None) -> int:
                 if not nginx_ready:
                     print("Nginx setup failed. The .env file was written; fix the problem and rerun the installer.", file=sys.stderr)
                     return 1
+            if not upgrade_databases(backend, values, args.non_interactive):
+                return 0
             start_stack(backend, plan, values)
         print("\nInstallation finished.")
         if plan.uses_keycloak and not args.no_start:

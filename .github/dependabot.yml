@@ -44,8 +44,11 @@ updates:
           - "rust"
 
   # Maintain third-party images referenced from docker-compose files
-  # (Keycloak, Postgres, Traefik). Postgres major upgrades need a data
-  # migration, so they are never proposed automatically.
+  # (Keycloak, Postgres, Traefik). Tags must name an exact version
+  # (e.g. postgres:19.0-trixie); a major-only tag like postgres:19 would never
+  # get a PR. Postgres major upgrades need a data migration
+  # (scripts/server_installer/postgres_upgrade.py), so they are never
+  # proposed automatically.
   - package-ecosystem: "docker-compose"
     directories:
       - "/backend"

@@ -201,6 +201,17 @@ Do not add `--profile` or `-f`: Docker Compose reads `COMPOSE_FILE` and `COMPOSE
 
 If an existing panel installation has no `MAVI_PANEL_PROXY_TOKEN`, rerun `./install-server.sh` from the repository root when upgrading. The installer generates the token and updates managed Nginx. For an external reverse proxy, apply the panel headers described in [External reverse proxy](#external-reverse-proxy) and forward the panel hostname directly to its loopback port so the rate limiter uses each client's IP.
 
+### Upgrading PostgreSQL
+
+PostgreSQL data only works with the major version that wrote it. The panel database runs PostgreSQL 19 and the Keycloak database runs PostgreSQL 18, the newest version Keycloak 26.8 supports. Both keep their data in `/var/lib/postgresql/<major>/docker`. Rerunning `./install-server.sh` detects older data and offers the upgrade before it starts any container. To run the upgrade on its own from the repository root:
+
+```bash
+sudo python3 -m scripts.server_installer.postgres_upgrade --check
+sudo python3 -m scripts.server_installer.postgres_upgrade
+```
+
+The upgrade stops the database and the services that use it. It dumps every database with the old server into `backend/backups/postgres/` (mode 0600), restores the dumps into a new cluster, and compares the row count of every table before it switches over. The old cluster stays in `<old major>/docker` inside the same volume or directory as a rollback copy. Delete it after you have checked the services; the script never deletes data. For a rollback, set the previous image tag and `PGDATA: /var/lib/postgresql/<old major>/docker` on the database service.
+
 ### Client credentials
 
 For classic mode, read the generated token and certificate PIN on the server and enter them manually in the client:

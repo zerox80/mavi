@@ -78,7 +78,7 @@ services:
   # Demo Web Server (Whoami)
   # Replace this with your actual web content (e.g., nginx) later
   web-server:
-    image: traefik/whoami
+    image: traefik/whoami:v1.12.0
     profiles: ["traefik"] # OPTIONAL
     container_name: web-server
     labels:

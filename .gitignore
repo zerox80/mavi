@@ -59,6 +59,7 @@ gui/src-tauri/build_error.txt
 
 # --- Backend ---
 /backend/data/
+/backend/backups/
 /docker/server/data/
 /backend/letsencrypt/
 .agents/workflows/gemini.md

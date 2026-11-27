@@ -158,6 +158,7 @@ class RetryFlowTests(unittest.TestCase):
                  mock.patch.object(installer, "confirm", return_value=True), \
                  mock.patch.object(installer, "prepare_images") as pull, \
                  mock.patch.object(installer, "install_nginx_with_consent", return_value=True) as nginx, \
+                 mock.patch.object(installer, "upgrade_databases", return_value=True), \
                  mock.patch.object(installer, "start_stack") as start:
                 code = installer.main(args)
             return code, (root / "backend/.env").exists(), collect.call_count, choose.call_count, pull.call_count, nginx.call_count, start.call_count
