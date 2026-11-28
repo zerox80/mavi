@@ -68,10 +68,10 @@ Ubuntu-Runner mit Docker; WSL wird fuer den lokalen Windows-Starter verwendet.
 
 Gradle-Downloads, Cargo-Downloads und die Rust-Builds der vier Architekturen
 liegen im Workflow in einem Verzeichnis des Runners und bleiben als
-GitHub-Actions-Cache zwischen den Laeufen erhalten. Nur Laeufe auf `main` und
-manuell gestartete Laeufe speichern Caches, auch den des Docker-Images. Andere
-Branches und Pull Requests lesen die Caches von `main`. Eine neue Rust-Version
-im Image beginnt mit einem leeren Build-Cache.
+GitHub-Actions-Cache zwischen den Laeufen erhalten. Nur Laeufe auf `main`
+speichern Caches, auch den des Docker-Images. Andere Branches und Pull Requests
+lesen die Caches von `main`. Eine neue Rust-Version im Image beginnt mit einem
+leeren Build-Cache.
 
 Nach einem erfolgreichen Lauf gibt es zwei herunterladbare Artefakte:
 `android-apk` mit der APK fuer alle vier Architekturen und
