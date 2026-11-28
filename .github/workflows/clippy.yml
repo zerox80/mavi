@@ -21,17 +21,11 @@ jobs:
           toolchain: stable
           components: clippy
 
-      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
         with:
-          path: |
-            ~/.cargo/registry/index/
-            ~/.cargo/registry/cache/
-            ~/.cargo/git/db/
-            target/
-          key: ${{ runner.os }}-cargo-clippy-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-cargo-clippy-
-            ${{ runner.os }}-cargo-
+          # Only main stores caches: other branches and pull requests can read
+          # them, and their own copies would push main's out of the 10 GB limit.
+          save-if: ${{ github.ref == 'refs/heads/main' }}
 
       - name: Install system dependencies
         run: |
@@ -64,17 +58,9 @@ jobs:
           toolchain: stable
           components: clippy
 
-      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
         with:
-          path: |
-            ~/.cargo/registry/index/
-            ~/.cargo/registry/cache/
-            ~/.cargo/git/db/
-            target/
-          key: ${{ runner.os }}-cargo-clippy-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-cargo-clippy-
-            ${{ runner.os }}-cargo-
+          save-if: ${{ github.ref == 'refs/heads/main' }}
 
       - name: Clippy windows crate (deny warnings)
         run: cargo clippy -p windows-vpn --all-targets -- -D warnings
