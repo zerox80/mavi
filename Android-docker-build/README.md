@@ -66,6 +66,13 @@ Workflow auf dem Standardbranch liegt, ist er auch unter **Actions -> Build
 Android APK -> Run workflow** manuell startbar. GitHub verwendet einen
 Ubuntu-Runner mit Docker; WSL wird fuer den lokalen Windows-Starter verwendet.
 
+Gradle-Downloads, Cargo-Downloads und die Rust-Builds der vier Architekturen
+liegen im Workflow in einem Verzeichnis des Runners und bleiben als
+GitHub-Actions-Cache zwischen den Laeufen erhalten. Nur Laeufe auf `main` und
+manuell gestartete Laeufe speichern Caches, auch den des Docker-Images. Andere
+Branches und Pull Requests lesen die Caches von `main`. Eine neue Rust-Version
+im Image beginnt mit einem leeren Build-Cache.
+
 Nach einem erfolgreichen Lauf gibt es zwei herunterladbare Artefakte:
 `android-apk` mit der APK fuer alle vier Architekturen und
 `android-build-lockfile` mit den beim Build verwendeten Fork-Revisionen.
@@ -117,6 +124,12 @@ Debug-Signierschluessel. Dadurch bleibt die Debug-Signatur zwischen lokalen
 Builds erhalten. `docker compose down` erhaelt die Volumes. Das Loeschen der
 Volumes entfernt auch den Debug-Schluessel; danach kann eine Neuinstallation
 der App notwendig sein.
+
+Mit `MAVI_ANDROID_CACHE_DIR=/absoluter/pfad` legt `build.sh` Gradle-Downloads,
+Cargo-Downloads und Rust-Builds stattdessen in diesem Verzeichnis ab
+(`compose.host-cache.yaml`). Der Container schreibt dort als root. Der
+Debug-Signierschluessel bleibt im Docker-Volume. GitHub Actions nutzt diesen
+Weg, weil ein neuer Runner keine Volumes mitbringt.
 
 Das externe Image verwendet JDK 21, Android-Plattform 37.1, Build Tools 36.0.0
 und 37.0.0, NDK 28.1.13356709 und Rust stable. SDK/NDK-Versionen im Repository

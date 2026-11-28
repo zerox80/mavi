@@ -1,0 +1,27 @@
+# build.sh adds this file when MAVI_ANDROID_CACHE_DIR is set. Gradle and Cargo
+# downloads and the Rust build output then live in that host directory instead
+# of Docker volumes, so a CI runner that starts without volumes can restore and
+# save them between runs. The debug signing key stays in its volume.
+services:
+  android:
+    volumes:
+      - type: bind
+        source: ${MAVI_ANDROID_CACHE_DIR:?}/gradle
+        target: /cache/gradle
+        bind:
+          create_host_path: true
+      - type: bind
+        source: ${MAVI_ANDROID_CACHE_DIR:?}/cargo-registry
+        target: /opt/cargo/registry
+        bind:
+          create_host_path: true
+      - type: bind
+        source: ${MAVI_ANDROID_CACHE_DIR:?}/cargo-git
+        target: /opt/cargo/git
+        bind:
+          create_host_path: true
+      - type: bind
+        source: ${MAVI_ANDROID_CACHE_DIR:?}/rust-target
+        target: /cache/target
+        bind:
+          create_host_path: true
