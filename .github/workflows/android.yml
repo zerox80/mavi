@@ -28,7 +28,9 @@ jobs:
       # Only main and manually started runs store caches: other branches and
       # pull requests can read main's, and their own copies would push main's
       # out of the repository's 10 GB limit.
-      SAVE_CACHES: ${{ github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch' }}
+      # TEMPORARY: this branch also stores caches so that saving and restoring
+      # can be tested before the change reaches main. Removed in the next commit.
+      SAVE_CACHES: ${{ github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch' || github.ref == 'refs/heads/ccr-e72e4df2-c1nms7' }}
     steps:
       - name: Check out source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
