@@ -20,6 +20,14 @@ LOCAL_UID="$(id -u)"
 LOCAL_GID="$(id -g)"
 export LOCAL_UID LOCAL_GID
 compose=(docker compose --file "$build_dir/compose.yaml")
+if [[ -n "${MAVI_ANDROID_CACHE_DIR:-}" ]]; then
+    # Compose would resolve a relative path against this directory, not the caller's.
+    if [[ "$MAVI_ANDROID_CACHE_DIR" != /* ]]; then
+        echo 'MAVI_ANDROID_CACHE_DIR muss ein absoluter Pfad sein.' >&2
+        exit 1
+    fi
+    compose+=(--file "$build_dir/compose.host-cache.yaml")
+fi
 builder_dir=''
 cleanup() {
     if [[ -n "$builder_dir" ]]; then

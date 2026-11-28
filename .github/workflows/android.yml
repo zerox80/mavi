@@ -22,6 +22,12 @@ jobs:
       MAVI_ANDROID_BUILD_IMAGE: mavi-android-build:ci
       MAVI_ANDROID_SKIP_IMAGE_BUILD: '1'
       MAVI_ANDROID_BUILD_CONTEXT: ${{ github.workspace }}/.android-builder
+      # build.sh keeps Gradle and Cargo downloads and the Rust build output here
+      # instead of in Docker volumes, which a fresh runner does not have.
+      MAVI_ANDROID_CACHE_DIR: ${{ github.workspace }}/.android-build-cache
+      # Only main stores caches: other branches and pull requests can read
+      # them, and their own copies would push main's out of the 10 GB limit.
+      SAVE_CACHES: ${{ github.ref == 'refs/heads/main' }}
     steps:
       - name: Check out source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -53,11 +59,44 @@ jobs:
           push: false
           tags: mavi-android-build:ci
           cache-from: type=gha,scope=android-toolchain
-          cache-to: type=gha,scope=android-toolchain,mode=max
+          cache-to: ${{ env.SAVE_CACHES == 'true' && 'type=gha,scope=android-toolchain,mode=max' || '' }}
+
+      - name: Read the Rust version of the build image
+        id: toolchain
+        shell: bash
+        run: |
+          version="$(docker run --rm --entrypoint rustc "$MAVI_ANDROID_BUILD_IMAGE" --version)"
+          echo "rustc=$(awk '{print $2}' <<<"$version")" >> "$GITHUB_OUTPUT"
+
+      # A new Rust release starts an empty cache: its build output cannot be
+      # reused, and this also drops what earlier dependency versions left behind.
+      - name: Restore Gradle, Cargo and Rust build caches
+        id: build-cache
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ env.MAVI_ANDROID_CACHE_DIR }}
+          key: android-apk-rust${{ steps.toolchain.outputs.rustc }}-${{ hashFiles('Cargo.lock', 'android/**/*.gradle.kts', 'android/gradle/**') }}
+          restore-keys: android-apk-rust${{ steps.toolchain.outputs.rustc }}-
+
+      # The container runs as root and Git rejects repositories of another
+      # user, so the restored Cargo checkouts must belong to root as well.
+      - name: Hand the build caches to the container user
+        shell: bash
+        run: |
+          mkdir -p "$MAVI_ANDROID_CACHE_DIR"
+          sudo chown -R 0:0 "$MAVI_ANDROID_CACHE_DIR"
 
       - name: Build and verify APK with the mavi-android-build image
         shell: bash
         run: bash Android-docker-build/build.sh assembleDebug
+
+      - name: Return the build caches to the runner user
+        if: always()
+        shell: bash
+        run: |
+          if [[ -d "$MAVI_ANDROID_CACHE_DIR" ]]; then
+            sudo chown -R "$(id -u):$(id -g)" "$MAVI_ANDROID_CACHE_DIR"
+          fi
 
       - name: Upload Android APK
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -72,3 +111,11 @@ jobs:
           name: android-build-lockfile
           path: Cargo.lock
           if-no-files-found: error
+
+      # Last, so that a slow or failed upload of the caches cannot hold back the APK.
+      - name: Save Gradle, Cargo and Rust build caches
+        if: env.SAVE_CACHES == 'true' && steps.build-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ env.MAVI_ANDROID_CACHE_DIR }}
+          key: ${{ steps.build-cache.outputs.cache-primary-key }}

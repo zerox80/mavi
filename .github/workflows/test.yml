@@ -41,16 +41,12 @@ jobs:
         uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # stable
         with:
           toolchain: stable
-      - name: Cache cargo registry
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      - name: Cache Rust dependencies
+        uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
         with:
-          path: |
-            ~/.cargo/registry/index/
-            ~/.cargo/registry/cache/
-            ~/.cargo/git/db/
-            target/
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: ${{ runner.os }}-cargo-
+          # Only main stores caches: other branches and pull requests can read
+          # them, and their own copies would push main's out of the 10 GB limit.
+          save-if: ${{ github.ref == 'refs/heads/main' }}
       - name: Install system dependencies
         run: |
           sudo apt-get update -q
@@ -105,18 +101,10 @@ jobs:
           toolchain: stable
       - name: Install cargo-llvm-cov
         uses: taiki-e/install-action@e28ac56891501ddb0600608470dbe94544964ed4 # cargo-llvm-cov
-      - name: Cache cargo registry
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      - name: Cache Rust dependencies
+        uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
         with:
-          path: |
-            ~/.cargo/registry/index/
-            ~/.cargo/registry/cache/
-            ~/.cargo/git/db/
-            target/
-          key: ${{ runner.os }}-cargo-coverage-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-cargo-coverage-
-            ${{ runner.os }}-cargo-
+          save-if: ${{ github.ref == 'refs/heads/main' }}
       - name: Install system dependencies
         run: |
           sudo apt-get update -q
@@ -171,16 +159,10 @@ jobs:
         uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # stable
         with:
           toolchain: stable
-      - name: Cache cargo registry
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      - name: Cache Rust dependencies
+        uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
         with:
-          path: |
-            ~/.cargo/registry/index/
-            ~/.cargo/registry/cache/
-            ~/.cargo/git/db/
-            target/
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: ${{ runner.os }}-cargo-
+          save-if: ${{ github.ref == 'refs/heads/main' }}
       - name: Test windows crate
         run: cargo test -p windows-vpn --verbose
       - name: Test shared Windows IPC authentication
@@ -215,18 +197,10 @@ jobs:
           toolchain: stable
       - name: Install cargo-llvm-cov
         uses: taiki-e/install-action@e28ac56891501ddb0600608470dbe94544964ed4 # cargo-llvm-cov
-      - name: Cache cargo registry
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      - name: Cache Rust dependencies
+        uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
         with:
-          path: |
-            ~/.cargo/registry/index/
-            ~/.cargo/registry/cache/
-            ~/.cargo/git/db/
-            target/
-          key: ${{ runner.os }}-cargo-coverage-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-cargo-coverage-
-            ${{ runner.os }}-cargo-
+          save-if: ${{ github.ref == 'refs/heads/main' }}
       - name: Generate Windows Rust coverage summary
         run: |
           New-Item -ItemType Directory -Force -Path target/coverage | Out-Null
